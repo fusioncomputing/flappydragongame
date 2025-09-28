@@ -62,6 +62,34 @@ These tickets expand the two high-priority gameplay initiatives from the backlog
   - Should shards reset on death or persist indefinitely? Suggest: persist but cap at 99 to encourage spending.
   - Do power-ups affect leaderboard integrity? Need to flag runs where toggles disabled or enabled.
 
+## Ticket: Relic Crafting & Loadouts
+- **Backlog Reference:** `docs/feature-backlog.md#relic-crafting--loadouts-high`
+- **Goal:** Deliver a pre-run customization layer where players craft and equip relic sets that meaningfully tweak core stats without breaking game balance.
+- **Success Metrics:**
+  - At least 65% of players who unlock the system equip a relic before their next run.
+  - Retention uplift of 10% for players who craft two or more relics (vs control cohort).
+- **Scope Overview:**
+  1. **Relic Economy & Persistence**
+     - Introduce relic shards earned via campaign gates, achievements, or seasonal events.
+     - Persist owned relics, shard counts, and crafting recipes in `Persistence`.
+  2. **Loadout Management UI**
+     - Build pre-run loadout screen with slot-based equip rules (offense/defense/utility).
+     - Add relic detail modal with stats, flavor text, and crafting requirements.
+  3. **Modifier Application Pipeline**
+     - Apply equipped relic modifiers to CONFIG snapshots before the run starts.
+     - Ensure buffs/debuffs surface in HUD (e.g., icons, tooltips).
+  4. **Content & Progression**
+     - Seed MVP catalog (6 relics) spanning offensive, defensive, and utility effects.
+     - Gate advanced recipes behind campaign milestones or achievements.
+- **Acceptance Criteria:**
+  - Players can collect shards, craft relics, equip loadouts, and feel the modifiers in subsequent runs.
+  - Loadout selections persist across sessions and respect slot rules.
+  - HUD communicates active relic effects; disabling all relics reverts gameplay to baseline.
+  - Analytics events fire for relic crafted/equipped/unequipped actions.
+- **Open Questions:**
+  - Should relic crafting consume shards permanently or allow respec/refund?
+  - How do relic modifiers interact with power-ups or campaign relic bonuses? Alignment needed with design.
+
 ## Suggested Follow-up Tasks
 - Break each ticket into granular engineering tasks (data model, UI, FX, QA) during sprint planning.
 - Tag related issues in the tracker once created, referencing this document for context.

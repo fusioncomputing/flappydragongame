@@ -47,6 +47,27 @@ This worksheet decomposes the two high-priority Phase 6 tickets into granular en
 - **Design Sync:** Align on shard drop rates, power-up durations, and fail-safe behaviour (e.g., stacking rules) before implementation begins.
 - **Analytics Sync:** Ensure dashboards capture meteor kill rate, average shards spent/run, and session duration changes post-launch.
 
+## Relic Crafting & Loadouts
+- **Epic Reference:** `docs/tickets/phase6-high-priority.md#ticket-relic-crafting--loadouts`
+- **Design Partner:** TBD (define relic catalog, slot rules, and shard economy)
+- **Analytics Partner:** TBD (plan dashboards for relic equip rates, shard sink health)
+
+### Proposed Issues
+| Area | Issue Title | Size | Notes |
+| --- | --- | --- | --- |
+| Data Model | "Persist relic inventory, shards, and crafting recipes" | M | Extend Persistence schema, migration required |
+| Gameplay Systems | "Apply relic modifiers on run initialisation" | S | Hook into CONFIG snapshot + HUD indicators |
+| Gameplay Systems | "Implement relic crafting & upgrade logic" | M | Combine shards, handle slot validations |
+| UI/UX | "Build loadout management screen & relic detail modal" | M | Pre-run flow, controller/touch parity |
+| UI/UX | "Surface active relic effects in HUD" | S | Icons/tooltips, accessibility contrast |
+| FX/Audio | "Create crafting/equip feedback cues" | S | Particles + SoundFX variations |
+| QA | "Relic system regression checklist" | S | Craft/equip/unequip scenarios, persistence |
+| Analytics | "Instrument relic crafted/equipped/unequipped events" | S | Event schema + validation script |
+
+### Cross-Team Follow-ups
+- **Design Sync:** Finalise relic effect list, slot counts, and shard drop rates before implementation.
+- **Analytics Sync:** Align on success metrics (equip rate, retention uplift) and confirm dashboards receiving new events.
+
 ## Next Actions
 1. Create tracker issues for each task (matching titles above) once project management tooling is ready.
 2. Assign design/analytics POCs to unblock outstanding questions noted per epic.

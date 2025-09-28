@@ -34,6 +34,7 @@ This backlog captures high-level gameplay ideas that build on the current Phase 
 - **Implementation Sketch:** Extend `GameState` with collectible counters, add power-up entities with timers, and surface UI badges in HUD.
 - **Dependencies:** Particle/audio variations, new iconography, balance pass alongside difficulty ramps.
 ### Relic Crafting & Loadouts (High)
+- **Ticket:** See `docs/tickets/phase6-high-priority.md#ticket-relic-crafting--loadouts` for detailed scope.
 - **Player Impact:** Allow players to earn, craft, and equip relic sets that tweak core stats before a run, creating meaningful pre-flight decisions.
 - **Design Notes:** Combine relic shards from campaign gates or achievements; enforce slot types (offense/defense/utility) to keep balance.
 - **Implementation Sketch:** Add relic inventory to persistence, pre-run loadout UI, and modifiers that hook into CONFIG before each run begins.
