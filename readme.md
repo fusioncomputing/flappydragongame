@@ -19,6 +19,7 @@ A portrait-oriented HTML5 canvas game inspired by Flappy Bird. Guide a tenacious
 ## Project Status
 - Core gameplay loop implemented: dragon physics, pillars, meteors, fireballs, scoring, and best-score persistence.
 - Phase 3 UX pass complete with start/menu buttons, pause overlays, mute toggle (persisted), and on-screen FIRE control.
+- Phase 4 audio & polish complete: Web Audio cues, parallax skyline, particle effects, and retuned difficulty curves.
 
 ## Features
 - Fixed virtual resolution (480x800) with responsive letterboxing.
@@ -27,8 +28,12 @@ A portrait-oriented HTML5 canvas game inspired by Flappy Bird. Guide a tenacious
 - Pillar spawning, meteor threats, and fireball projectiles with cooldown-limited shooting and bonus scoring.
 - Touch-first enhancements: on-screen FIRE button, tap-to-flap, and HUD indicators mirroring keyboard controls.
 - Persistent best-score and mute settings via `localStorage`.
+- Layered parallax backdrop with animated starfield and responsive ground strip.
+- Lightweight Web Audio soundboard with mute persistence and first-input unlock.
+- Particle bursts for crashes, meteor hits, and score pops tied to HUD feedback.
 
 ## Tech Stack
+
 - HTML5 canvas + vanilla JavaScript (ES module style IIFE).
 - CSS for responsive portrait layout and presentation polish.
 - No external runtime dependencies or build tooling required.
@@ -68,8 +73,10 @@ A portrait-oriented HTML5 canvas game inspired by Flappy Bird. Guide a tenacious
 - Escape: leave to menu
 - Mouse or touch tap: flap (tap to hold FIRE button for touch shooting)
 - M: toggle mute
+- First tap or key press unlocks audio cues (browser requirement).
 
 ## Game States
+
 - **BOOT**: preload assets, transition to Menu when ready.
 - **MENU**: title screen with Play and Mute buttons.
 - **PLAY**: active gameplay loop and scoring.
@@ -79,9 +86,9 @@ A portrait-oriented HTML5 canvas game inspired by Flappy Bird. Guide a tenacious
 ## Core Systems Specification
 Key numbers that shape the moment-to-moment feel:
 - Dragon: x = 120, radius 22, gravity 1800, flap impulse vy = -520, max fall speed 900.
-- Pillars: width 90, horizontal speed 180, gap starts at 220 (never below 150), spacing 280-360px.
-- Meteors: radius 14, speed 260-340, spawn interval eases from 2.5s to 1.2s.
-- Fireballs: speed 520, cooldown 0.30s, lifetime 2.0s, radius 10.
+- Pillars: width 90, scroll speed eases from 184 to 252 as difficulty rises, gaps contract from 218px toward a 140px floor, spacing starts at 260-340px and tightens late run.
+- Meteors: radius 14, base speed 240-360 with subtle drift, spawn cadence eases from 2.4s down to 0.85s.
+- Fireballs: speed 540, cooldown 0.28s, lifetime 2.0s, radius 10.
 - Ground collision at y = 720; top bound collision ends the run.
 
 Collision fairness:
@@ -93,10 +100,10 @@ Collision fairness:
 High-level roadmap (full detail in `docs/development-plan.md`):
 1. **Phase 0 - Foundations**: Repo setup, tooling decisions, local server workflow (complete).
 2. **Phase 1 - Core Scaffolding**: Canvas bootstrap, scene manager, input plumbing (complete).
-3. **Phase 2 - Gameplay Systems**: Core gameplay loop implemented (dragon, pillars, meteors, fireball combat); balancing and polish continue.
+3. **Phase 2 - Gameplay Systems**: Core loop, combat, and balancing passes (complete; difficulty curve tuned in Phase 4).
 4. **Phase 3 - UX and Controls**: Start/pause/game-over overlays, mute persistence, mobile controls (complete).
-5. **Phase 4 - Audio and Polish**: Asset loader wiring, particles, parallax, mute handling.
-6. **Phase 5 - QA and Release**: Regression checklist, performance passes, documentation finalization.
+5. **Phase 4 - Audio and Polish**: Web Audio cues, parallax backdrop, particle FX, and difficulty retune (complete).
+6. **Phase 5 - QA and Release**: Regression checklist, performance passes, documentation finalization (pending).
 
 Progress updates are committed to `main` after every milestone to keep trunk deployment-ready.
 
@@ -108,11 +115,15 @@ Manual QA should cover:
 - On-screen FIRE button responds to taps/holds and respects cooldown.
 - Score increments once per pillar pair; meteor bonus applies on confirmed hits.
 - Difficulty ramps with tighter gaps and faster spawns later in runs.
-- Canvas resizes without distortion; letterboxing stable.
+- Audio cues unlock on first input and respect mute toggles across scenes.
+- Particle bursts appear for meteor hits, crashes, and score pops without stalling the frame rate.
+- Parallax backdrop and ground scroll smoothly on long sessions and window resizes.
+- Canvas resizes without distortion; letterboxing stays stable.
 - Pause/resume flow preserves state without resetting.
 - Mute and best score persist via `localStorage`.
 
 ## Contributing
+
 Trunk-based workflow on `main`. Push small, reviewed increments with descriptive commits. Coordinate via issues or discussions for larger features.
 
 ## License

@@ -1,15 +1,15 @@
 # Flappy Dragon Delivery Plan
 
-_Last updated: 2025-09-27_
+_Last updated: 2025-09-28_
 
 ## Phase Summary
 | Phase | Focus | Status |
 | ----- | ----- | ------ |
 | 0 | Foundations (tooling, repo, workflow) | Complete |
 | 1 | Core scaffolding (canvas, scenes, input plumbing) | Complete |
-| 2 | Gameplay systems (dragon, pillars, meteors, fireballs) | Core loop implemented |
+| 2 | Gameplay systems (dragon, pillars, meteors, fireballs) | Complete |
 | 3 | UX and controls polish (menus, overlays, persistence) | Complete |
-| 4 | Audio, art, and moment-to-moment polish | Pending |
+| 4 | Audio, art, and moment-to-moment polish | Complete |
 | 5 | QA, performance, release documentation | Pending |
 
 ## Phase 0 - Foundations (Complete)
@@ -22,12 +22,12 @@ _Last updated: 2025-09-27_
 - Implement CONFIG constants, scene registry shell, requestAnimationFrame loop stub, and resize handling.
 - Add lint-friendly structure (`'use strict'`, modular organization) ready for future expansion.
 
-## Phase 2 - Gameplay Systems (Core loop implemented)
+## Phase 2 - Gameplay Systems (Complete)
 - [x] Dragon physics model (gravity, impulse, clamped velocity, rotation hint) with collision circle data.
 - [x] Pillar pair spawner with spacing randomization, pooling, and scoring triggers.
 - [x] Meteor generator with variable speed, spawn cadence easing toward minimum, safe spawn band.
 - [x] Fireball system with cooldown, lifespan, and overlap checks versus meteors.
-- [ ] Difficulty tuning, particle feedback, and spawn balancing passes.
+- [x] Difficulty tuning, particle feedback, and spawn balancing passes.
 
 ## Phase 3 - UX and Controls (Complete)
 - [x] Menu UI with Play button, controls tooltip, and persistent mute toggle.
@@ -35,10 +35,11 @@ _Last updated: 2025-09-27_
 - [x] Game Over panel with score, best, cause summary, Play Again and Leave interactions.
 - [x] On-screen FIRE button plus tap-to-flap handling; keyboard/mouse parity retained.
 
-## Phase 4 - Audio and Polish (Pending)
-- Asset loader to preload sprites/audio; geometric fallback if assets missing.
-- Background parallax, ground strip, particle flourishes for fireball/meteor impacts.
-- Integrate mute toggle with audio playback, add soundscape, and refine responsive letterboxing.
+## Phase 4 - Audio and Polish (Complete)
+- [x] SoundFX helper with Web Audio cues, gesture unlock, and mute integration.
+- [x] Layered parallax backdrop with animated starfield and responsive ground strip.
+- [x] Particle flourishes for meteor impacts, crashes, and score pops.
+- [x] Retuned pillar gaps, scroll speed, and meteor cadence for a smoother difficulty curve.
 
 ## Phase 5 - QA and Release (Pending)
 - Manual regression checklist aligned with README test section (flap responsiveness, fairness, spawn cadence, persistence).

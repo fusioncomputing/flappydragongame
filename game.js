@@ -15,25 +15,37 @@ const CONFIG = Object.freeze({
     maxFallSpeed: 900
   }),
   pillar: Object.freeze({
-    speed: 180,
+    speedStart: 184,
+    speedEnd: 252,
     width: 90,
-    gapStart: 220,
-    gapMin: 150,
-    spacingMinX: 280,
-    spacingMaxX: 360
+    gapStart: 218,
+    gapMin: 140,
+    spacingMinX: 260,
+    spacingMaxX: 340
   }),
   meteor: Object.freeze({
     radius: 14,
-    speedMin: 260,
-    speedMax: 340,
-    spawnIntervalStart: 2.5,
-    spawnIntervalMin: 1.2
+    speedMin: 240,
+    speedMax: 360,
+    spawnIntervalStart: 2.4,
+    spawnIntervalMin: 0.85
   }),
   fireball: Object.freeze({
     radius: 10,
-    speed: 520,
-    cooldown: 0.3,
+    speed: 540,
+    cooldown: 0.28,
     lifetime: 2
+  }),
+  particles: Object.freeze({
+    cap: 220
+  }),
+  backdrop: Object.freeze({
+    starLayers: [
+      { count: 22, depth: 0.18, size: 1.4 },
+      { count: 28, depth: 0.42, size: 2.0 },
+      { count: 34, depth: 0.72, size: 2.8 }
+    ],
+    nebulaColors: ['rgba(118, 86, 199, 0.16)', 'rgba(64, 146, 198, 0.22)']
   })
 });
 
@@ -78,7 +90,6 @@ const AssetLoader = (() => {
   const registry = new Map();
 
   function loadAll() {
-    // Placeholder for future sprite/audio loading.
     return Promise.resolve(registry);
   }
 
@@ -130,11 +141,243 @@ const Persistence = (() => {
   return { loadBestScore, saveBestScore, loadMuted, saveMuted };
 })();
 
+const VisualState = {
+  globalTime: 0,
+  lastScrollSpeed: CONFIG.pillar.speedStart,
+  stars: generateStarfield(),
+  twinkleSeed: Math.random() * Math.PI * 2
+};
+
+function generateStarfield() {
+  const stars = [];
+  for (const layer of CONFIG.backdrop.starLayers) {
+    for (let i = 0; i < layer.count; i += 1) {
+      stars.push({
+        baseX: Math.random() * (CONFIG.width + 160) - 80,
+        baseY: Math.random() * (CONFIG.groundY - 80) + 20,
+        depth: layer.depth,
+        size: layer.size,
+        twinkle: Math.random() * Math.PI * 2
+      });
+    }
+  }
+  return stars;
+}
+const SoundFX = (() => {
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  const MASTER_GAIN = 0.32;
+  let context = null;
+  let masterGain = null;
+  let unlocked = false;
+
+  function ensureContext() {
+    if (!AudioCtx) {
+      return null;
+    }
+    if (!context) {
+      context = new AudioCtx();
+      masterGain = context.createGain();
+      masterGain.gain.value = MASTER_GAIN;
+      masterGain.connect(context.destination);
+    }
+    return context;
+  }
+
+  function unlock() {
+    if (unlocked) {
+      return;
+    }
+    const ctx = ensureContext();
+    if (ctx && ctx.state === 'suspended' && !isMuted) {
+      ctx.resume().catch(() => {});
+    }
+    unlocked = true;
+  }
+
+  function setMuted(value) {
+    if (!context) {
+      if (!value && unlocked) {
+        const ctx = ensureContext();
+        if (ctx && ctx.state === 'suspended') {
+          ctx.resume().catch(() => {});
+        }
+      }
+      return;
+    }
+
+    if (value) {
+      masterGain.gain.setTargetAtTime(0.0001, context.currentTime, 0.04);
+      if (context.state === 'running') {
+        context.suspend().catch(() => {});
+      }
+    } else {
+      masterGain.gain.setTargetAtTime(MASTER_GAIN, context.currentTime, 0.05);
+      if (context.state === 'suspended' && unlocked) {
+        context.resume().catch(() => {});
+      }
+    }
+  }
+
+  function play(name) {
+    if (isMuted || !unlocked) {
+      return;
+    }
+    const ctx = ensureContext();
+    if (!ctx || ctx.state !== 'running' || !masterGain) {
+      return;
+    }
+    const cue = cues[name];
+    if (cue) {
+      cue(ctx, masterGain);
+    }
+  }
+
+  function simpleTone(ctx, destination, options) {
+    const {
+      frequency = 440,
+      endFrequency = frequency,
+      duration = 0.15,
+      gain = 0.15,
+      type = 'sine',
+      delay = 0
+    } = options;
+    const startTime = ctx.currentTime + delay;
+    const osc = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(frequency, startTime);
+    if (endFrequency !== frequency) {
+      osc.frequency.linearRampToValueAtTime(endFrequency, startTime + duration);
+    }
+    const initialGain = Math.max(gain, 0.001);
+    gainNode.gain.setValueAtTime(initialGain, startTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+    osc.connect(gainNode);
+    gainNode.connect(destination);
+    osc.start(startTime);
+    osc.stop(startTime + duration + 0.05);
+  }
+
+  function hushedChord(ctx, destination) {
+    const now = ctx.currentTime;
+    const gains = [0.18, 0.14, 0.12];
+    const freqs = [330, 392, 524];
+    freqs.forEach((freq, index) => {
+      simpleTone(ctx, destination, {
+        frequency: freq,
+        endFrequency: freq * 0.97,
+        duration: 0.4,
+        gain: gains[index],
+        type: 'triangle',
+        delay: index * 0.02
+      });
+    });
+    const impact = ctx.createOscillator();
+    const impactGain = ctx.createGain();
+    impact.type = 'sawtooth';
+    impact.frequency.setValueAtTime(110, now);
+    impact.frequency.linearRampToValueAtTime(65, now + 0.28);
+    impactGain.gain.setValueAtTime(0.2, now);
+    impactGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.32);
+    impact.connect(impactGain);
+    impactGain.connect(destination);
+    impact.start(now);
+    impact.stop(now + 0.4);
+  }
+
+  const cues = {
+    flap(ctx, destination) {
+      simpleTone(ctx, destination, {
+        frequency: 780,
+        endFrequency: 880,
+        duration: 0.12,
+        gain: 0.18,
+        type: 'triangle'
+      });
+    },
+    fire(ctx, destination) {
+      simpleTone(ctx, destination, {
+        frequency: 560,
+        endFrequency: 320,
+        duration: 0.14,
+        gain: 0.2,
+        type: 'sawtooth'
+      });
+      simpleTone(ctx, destination, {
+        frequency: 960,
+        endFrequency: 420,
+        duration: 0.1,
+        gain: 0.12,
+        type: 'square',
+        delay: 0.02
+      });
+    },
+    score(ctx, destination) {
+      simpleTone(ctx, destination, {
+        frequency: 880,
+        endFrequency: 1040,
+        duration: 0.22,
+        gain: 0.16,
+        type: 'sine'
+      });
+    },
+    hit(ctx, destination) {
+      simpleTone(ctx, destination, {
+        frequency: 420,
+        endFrequency: 180,
+        duration: 0.24,
+        gain: 0.2,
+        type: 'triangle'
+      });
+    },
+    crash(ctx, destination) {
+      simpleTone(ctx, destination, {
+        frequency: 180,
+        endFrequency: 60,
+        duration: 0.4,
+        gain: 0.28,
+        type: 'sawtooth'
+      });
+      simpleTone(ctx, destination, {
+        frequency: 90,
+        endFrequency: 45,
+        duration: 0.5,
+        gain: 0.22,
+        type: 'square',
+        delay: 0.04
+      });
+    },
+    start(ctx, destination) {
+      hushedChord(ctx, destination);
+    },
+    select(ctx, destination) {
+      simpleTone(ctx, destination, {
+        frequency: 640,
+        endFrequency: 720,
+        duration: 0.12,
+        gain: 0.14,
+        type: 'triangle'
+      });
+    },
+    toggle(ctx, destination) {
+      simpleTone(ctx, destination, {
+        frequency: 520,
+        endFrequency: 220,
+        duration: 0.18,
+        gain: 0.16,
+        type: 'sine'
+      });
+    }
+  };
+
+  return { unlock, play, setMuted };
+})();
 const GameState = {
   dragon: null,
   pillars: [],
   meteors: [],
   fireballs: [],
+  particles: [],
   score: 0,
   elapsed: 0,
   timeUntilNextPillar: 0,
@@ -142,7 +385,9 @@ const GameState = {
   fireCooldown: 0,
   pendingFlap: false,
   pendingFire: false,
-  runActive: false
+  runActive: false,
+  difficulty: 0,
+  scrollSpeed: CONFIG.pillar.speedStart
 };
 
 const UI_LAYOUT = Object.freeze({
@@ -169,30 +414,49 @@ function resetGameState() {
   GameState.pillars = [];
   GameState.meteors = [];
   GameState.fireballs = [];
+  GameState.particles = [];
   GameState.score = 0;
   GameState.elapsed = 0;
   GameState.fireCooldown = 0;
   GameState.pendingFlap = false;
   GameState.pendingFire = false;
-  GameState.timeUntilNextPillar = 0;
+  GameState.timeUntilNextPillar = 0.4;
   GameState.timeUntilNextMeteor = CONFIG.meteor.spawnIntervalStart;
   GameState.runActive = true;
+  GameState.difficulty = 0;
+  GameState.scrollSpeed = CONFIG.pillar.speedStart;
 
   UIState.firePointers.clear();
   UIState.fireButtonPressed = false;
+  VisualState.lastScrollSpeed = CONFIG.pillar.speedStart;
 
   spawnPillarPair(true);
 }
 
+function computeDifficulty() {
+  const scoreFactor = clamp(GameState.score / 36, 0, 1);
+  const timeFactor = clamp(GameState.elapsed / 62, 0, 1);
+  return clamp(scoreFactor * 0.65 + timeFactor * 0.35, 0, 1);
+}
+
+function currentScrollSpeed() {
+  const eased = easeInOutCubic(GameState.difficulty);
+  return CONFIG.pillar.speedStart + (CONFIG.pillar.speedEnd - CONFIG.pillar.speedStart) * eased;
+}
+
 function spawnPillarPair(initial = false) {
-  const difficultyFactor = Math.min(GameState.score, 30) / 30;
-  const gapSizeReduction = (CONFIG.pillar.gapStart - CONFIG.pillar.gapMin) * difficultyFactor;
-  const gapSize = Math.max(CONFIG.pillar.gapMin, CONFIG.pillar.gapStart - gapSizeReduction);
+  const eased = easeOutQuad(GameState.difficulty);
+  const gapReduction = (CONFIG.pillar.gapStart - CONFIG.pillar.gapMin) * (0.25 + 0.75 * eased);
+  const gapSize = clamp(CONFIG.pillar.gapStart - gapReduction, CONFIG.pillar.gapMin, CONFIG.pillar.gapStart);
   const safeTop = 110;
   const safeBottom = CONFIG.groundY - 110;
   const halfGap = gapSize / 2;
   const gapCenter = randomRange(safeTop + halfGap, safeBottom - halfGap);
-  const spawnOffset = initial ? randomRange(180, 240) : randomRange(80, 160);
+
+  const spacingMin = CONFIG.pillar.spacingMinX - 42 * eased;
+  const spacingMax = CONFIG.pillar.spacingMaxX - 58 * eased;
+  const spacing = randomRange(spacingMin, spacingMax);
+  const spawnOffset = initial ? randomRange(180, 240) : randomRange(90, 160);
 
   GameState.pillars.push({
     x: CONFIG.width + spawnOffset,
@@ -202,30 +466,32 @@ function spawnPillarPair(initial = false) {
     scored: false
   });
 
-  const spacing = randomRange(CONFIG.pillar.spacingMinX, CONFIG.pillar.spacingMaxX);
-  GameState.timeUntilNextPillar = spacing / CONFIG.pillar.speed;
+  GameState.timeUntilNextPillar = spacing / GameState.scrollSpeed;
   if (initial) {
-    GameState.timeUntilNextPillar *= 0.6;
+    GameState.timeUntilNextPillar *= 0.55;
   }
 }
 
 function spawnMeteor() {
-  const safeTop = 90;
-  const safeBottom = CONFIG.groundY - 100;
+  const eased = easeOutQuad(GameState.difficulty);
+  const safeTop = 90 + 40 * eased;
+  const safeBottom = CONFIG.groundY - 100 - 30 * eased;
   GameState.meteors.push({
     x: CONFIG.width + 90,
     y: randomRange(safeTop, safeBottom),
     radius: CONFIG.meteor.radius,
-    speed: randomRange(CONFIG.meteor.speedMin, CONFIG.meteor.speedMax)
+    speed: randomRange(CONFIG.meteor.speedMin, CONFIG.meteor.speedMax),
+    drift: randomRange(-26, 26)
   });
 
   GameState.timeUntilNextMeteor = computeMeteorInterval();
 }
 
 function computeMeteorInterval() {
-  const difficultyFactor = Math.min(GameState.score, 40) / 40;
-  const intervalRange = CONFIG.meteor.spawnIntervalStart - CONFIG.meteor.spawnIntervalMin;
-  return CONFIG.meteor.spawnIntervalStart - intervalRange * difficultyFactor;
+  const eased = easeInOutCubic(GameState.difficulty);
+  const range = CONFIG.meteor.spawnIntervalStart - CONFIG.meteor.spawnIntervalMin;
+  const offset = range * (0.3 + 0.7 * eased);
+  return Math.max(0.6, CONFIG.meteor.spawnIntervalStart - offset);
 }
 
 function requestFlap() {
@@ -244,6 +510,7 @@ function requestFire() {
 
 function applyFlap() {
   GameState.dragon.vy = CONFIG.dragon.flapImpulseVy;
+  SoundFX.play('flap');
 }
 
 function attemptFire() {
@@ -259,6 +526,7 @@ function attemptFire() {
     lifetime: CONFIG.fireball.lifetime
   });
   GameState.fireCooldown = CONFIG.fireball.cooldown;
+  SoundFX.play('fire');
 }
 
 function updatePlayState(dt) {
@@ -283,6 +551,10 @@ function updatePlayState(dt) {
     attemptFire();
   }
 
+  GameState.difficulty = computeDifficulty();
+  GameState.scrollSpeed = currentScrollSpeed();
+  VisualState.lastScrollSpeed = GameState.scrollSpeed;
+
   if (updateDragon(dt)) {
     return;
   }
@@ -296,14 +568,14 @@ function updatePlayState(dt) {
   }
 
   updateFireballs(dt);
+  Particles.update(GameState.particles, dt);
 }
-
 function updateDragon(dt) {
   const dragon = GameState.dragon;
   dragon.vy += CONFIG.gravity * dt;
   dragon.vy = Math.min(dragon.vy, CONFIG.dragon.maxFallSpeed);
   dragon.y += dragon.vy * dt;
-  dragon.rotation = clamp(dragon.vy / 640, -0.75, 0.8);
+  dragon.rotation = clamp(dragon.vy / 640, -0.75, 0.85);
 
   if (dragon.y - dragon.radius <= 0) {
     finishRun('ceiling');
@@ -329,7 +601,7 @@ function updatePillars(dt) {
 
   for (let i = GameState.pillars.length - 1; i >= 0; i -= 1) {
     const pillar = GameState.pillars[i];
-    pillar.x -= CONFIG.pillar.speed * dt;
+    pillar.x -= GameState.scrollSpeed * dt;
 
     const halfGap = pillar.gapSize / 2;
     const topRect = {
@@ -353,6 +625,12 @@ function updatePillars(dt) {
     if (!pillar.scored && pillar.x + pillar.width < dragon.x - dragon.radius) {
       pillar.scored = true;
       GameState.score += 1;
+      Particles.spawnScorePop(GameState.particles, {
+        amount: 1,
+        x: CONFIG.width / 2,
+        y: 48
+      });
+      SoundFX.play('score');
     }
 
     if (pillar.x + pillar.width < -140) {
@@ -373,7 +651,8 @@ function updateMeteors(dt) {
 
   for (let i = GameState.meteors.length - 1; i >= 0; i -= 1) {
     const meteor = GameState.meteors[i];
-    meteor.x -= meteor.speed * dt;
+    meteor.x -= (GameState.scrollSpeed * 0.65 + meteor.speed) * dt;
+    meteor.y += meteor.drift * dt * 0.4;
 
     if (meteor.x + meteor.radius < -100) {
       GameState.meteors.splice(i, 1);
@@ -407,6 +686,13 @@ function updateFireballs(dt) {
         GameState.meteors.splice(j, 1);
         GameState.fireballs.splice(i, 1);
         GameState.score += 1;
+        Particles.spawnMeteorImpact(GameState.particles, meteor.x, meteor.y);
+        Particles.spawnScorePop(GameState.particles, {
+          amount: 1,
+          x: CONFIG.width / 2,
+          y: 48
+        });
+        SoundFX.play('hit');
         hitMeteor = true;
         break;
       }
@@ -424,21 +710,60 @@ function finishRun(reason) {
   }
 
   GameState.runActive = false;
+  const crashX = GameState.dragon?.x ?? CONFIG.dragon.x;
+  const crashY = GameState.dragon?.y ?? CONFIG.dragon.yStart;
+  Particles.spawnCrashBurst(GameState.particles, crashX, crashY, reason);
+  SoundFX.play('crash');
+
   const newBest = Math.max(bestScore, GameState.score);
   if (newBest > bestScore) {
     bestScore = newBest;
     Persistence.saveBestScore(bestScore);
   }
 
-  SceneManager.enter('GAME_OVER', { score: GameState.score, best: bestScore, reason });
+  const snapshot = createRunSnapshot(reason);
+  SceneManager.enter('GAME_OVER', { score: GameState.score, best: bestScore, reason, snapshot });
 }
 
+function createRunSnapshot(reason) {
+  return {
+    elapsed: GameState.elapsed,
+    score: GameState.score,
+    fireCooldown: GameState.fireCooldown,
+    dragon: GameState.dragon ? { ...GameState.dragon } : null,
+    pillars: GameState.pillars.map((pillar) => ({ ...pillar })),
+    meteors: GameState.meteors.map((meteor) => ({ ...meteor })),
+    fireballs: GameState.fireballs.map((fireball) => ({ ...fireball })),
+    particles: Particles.clone(GameState.particles),
+    reason
+  };
+}
 function randomRange(min, max) {
   return Math.random() * (max - min) + min;
 }
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
+}
+
+function wrapValue(value, min, max) {
+  const range = max - min;
+  if (range === 0) {
+    return min;
+  }
+  let result = (value - min) % range;
+  if (result < 0) {
+    result += range;
+  }
+  return result + min;
+}
+
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function easeOutQuad(t) {
+  return 1 - (1 - t) * (1 - t);
 }
 
 function circleVsRect(circle, rect, inset = 0) {
@@ -477,9 +802,127 @@ function isPointInCircle(x, y, circle) {
 
 function toggleMute() {
   isMuted = !isMuted;
+  SoundFX.setMuted(isMuted);
   Persistence.saveMuted(isMuted);
 }
 
+const Particles = (() => {
+  function push(list, particle) {
+    if (list.length >= CONFIG.particles.cap) {
+      list.splice(0, list.length - CONFIG.particles.cap + 1);
+    }
+    list.push(particle);
+  }
+
+  function spawnScorePop(list, options) {
+    const amount = options?.amount ?? 1;
+    const text = amount > 1 ? `+${amount}` : '+1';
+    const x = (options?.x ?? CONFIG.width / 2) + randomRange(-10, 10);
+    const y = (options?.y ?? 50) + randomRange(-4, 4);
+    push(list, {
+      type: 'text',
+      layer: 'hud',
+      text,
+      x,
+      y,
+      vx: randomRange(-12, 12),
+      vy: randomRange(-28, -16),
+      life: 0.9,
+      ttl: 0.9,
+      color: '255, 238, 193'
+    });
+  }
+
+  function spawnMeteorImpact(list, x, y) {
+    for (let i = 0; i < 18; i += 1) {
+      const angle = randomRange(0, Math.PI * 2);
+      const speed = randomRange(120, 240);
+      push(list, {
+        type: 'spark',
+        layer: 'world',
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: randomRange(0.35, 0.55),
+        ttl: randomRange(0.35, 0.55),
+        size: randomRange(2, 4),
+        color: '255, 214, 102'
+      });
+    }
+  }
+
+  function spawnCrashBurst(list, x, y, reason) {
+    const amount = reason === 'meteor' ? 30 : 26;
+    const palette = reason === 'ground' ? '255, 168, 92' : '255, 122, 122';
+    for (let i = 0; i < amount; i += 1) {
+      const angle = randomRange(0, Math.PI * 2);
+      const speed = randomRange(80, 220);
+      push(list, {
+        type: 'spark',
+        layer: 'world',
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: randomRange(0.4, 0.7),
+        ttl: randomRange(0.4, 0.7),
+        size: randomRange(2.4, 5.2),
+        color: palette
+      });
+    }
+  }
+
+  function update(list, dt) {
+    for (let i = list.length - 1; i >= 0; i -= 1) {
+      const particle = list[i];
+      particle.life -= dt;
+      if (particle.life <= 0) {
+        list.splice(i, 1);
+        continue;
+      }
+      particle.x += particle.vx * dt;
+      particle.y += particle.vy * dt;
+      if (particle.type === 'spark') {
+        particle.vy += 200 * dt;
+        particle.vx *= 0.98;
+        particle.vy *= 0.98;
+      } else if (particle.type === 'text') {
+        particle.vx *= 0.92;
+        particle.vy *= 0.92;
+      }
+    }
+  }
+
+  function draw(ctx, list, layer) {
+    for (const particle of list) {
+      if (particle.layer !== layer) {
+        continue;
+      }
+      const alpha = clamp(particle.life / particle.ttl, 0, 1);
+      if (particle.type === 'spark') {
+        ctx.fillStyle = `rgba(${particle.color}, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (particle.type === 'text') {
+        ctx.save();
+        ctx.fillStyle = `rgba(${particle.color}, ${alpha})`;
+        ctx.font = "700 24px 'Segoe UI', Tahoma, sans-serif";
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(particle.text, particle.x, particle.y);
+        ctx.restore();
+      }
+    }
+  }
+
+  function clone(list) {
+    return list.map((particle) => ({ ...particle }));
+  }
+
+  return { spawnScorePop, spawnMeteorImpact, spawnCrashBurst, update, draw, clone };
+})();
 const Scenes = {};
 
 const SceneManager = (() => {
@@ -535,6 +978,7 @@ Scenes.BOOT = {
     AssetLoader.loadAll().then(() => {
       bestScore = Persistence.loadBestScore();
       isMuted = Persistence.loadMuted();
+      SoundFX.setMuted(isMuted);
       SceneManager.enter('MENU');
     });
   },
@@ -578,9 +1022,11 @@ Scenes.MENU = {
       switch (input.code) {
         case 'Space':
         case 'Enter':
+          SoundFX.play('select');
           SceneManager.enter('PLAY');
           break;
         case 'KeyM':
+          SoundFX.play('toggle');
           toggleMute();
           break;
         default:
@@ -588,14 +1034,15 @@ Scenes.MENU = {
       }
     } else if (input.type === 'pointer' && input.phase === 'down') {
       if (isPointInRect(input.x, input.y, this.startRect)) {
+        SoundFX.play('select');
         SceneManager.enter('PLAY');
       } else if (isPointInRect(input.x, input.y, this.muteRect)) {
+        SoundFX.play('toggle');
         toggleMute();
       }
     }
   }
 };
-
 Scenes.PLAY = {
   enter(data) {
     if (data && data.resume) {
@@ -605,6 +1052,7 @@ Scenes.PLAY = {
       return;
     }
     resetGameState();
+    SoundFX.play('start');
   },
   leave() {
     GameState.runActive = false;
@@ -617,12 +1065,7 @@ Scenes.PLAY = {
     updatePlayState(dt);
   },
   draw(ctx) {
-    drawBackdrop(ctx);
-    drawPillars(ctx, GameState.pillars);
-    drawMeteors(ctx, GameState.meteors);
-    drawFireballs(ctx, GameState.fireballs);
-    drawDragon(ctx, GameState.dragon);
-    drawHUD(ctx);
+    renderWorld(ctx, GameState, { overlayAlpha: 0, showHUD: true });
   },
   handleInput(input) {
     if (input.type === 'key') {
@@ -645,6 +1088,7 @@ Scenes.PLAY = {
           SceneManager.enter('MENU');
           break;
         case 'KeyM':
+          SoundFX.play('toggle');
           toggleMute();
           break;
         default:
@@ -687,7 +1131,7 @@ Scenes.PAUSE = {
     this._blink = (this._blink + dt) % 1.6;
   },
   draw(ctx) {
-    drawBackdrop(ctx, 0.35);
+    renderWorld(ctx, GameState, { overlayAlpha: 0.32, showHUD: true });
     drawCenteredText(ctx, 'Paused', 42, -120, '#fefbff', '600');
     if (this._blink < 0.8) {
       drawCenteredText(ctx, 'Press P to resume • M to mute', 18, -50, '#d2dbff');
@@ -709,6 +1153,7 @@ Scenes.PAUSE = {
           SceneManager.enter('MENU');
           break;
         case 'KeyM':
+          SoundFX.play('toggle');
           toggleMute();
           break;
         default:
@@ -723,7 +1168,6 @@ Scenes.PAUSE = {
     }
   }
 };
-
 Scenes.GAME_OVER = {
   enter(data) {
     this._score = data?.score ?? 0;
@@ -732,12 +1176,21 @@ Scenes.GAME_OVER = {
     this._pulse = 0;
     this.playAgainRect = createButtonRect(CONFIG.width / 2 - 150, CONFIG.height / 2 + 30, 300, 66);
     this.menuRect = createButtonRect(CONFIG.width / 2 - 150, CONFIG.height / 2 + 110, 300, 58);
+    this._snapshot = data?.snapshot ?? null;
   },
   update(dt) {
     this._pulse = (this._pulse + dt) % 2;
+    if (this._snapshot) {
+      Particles.update(this._snapshot.particles, dt);
+    }
   },
   draw(ctx) {
-    drawBackdrop(ctx, 0.15);
+    if (this._snapshot) {
+      renderWorld(ctx, this._snapshot, { overlayAlpha: 0.22, showHUD: false });
+    } else {
+      drawBackdrop(ctx, 0.22);
+    }
+
     drawCenteredText(ctx, 'Game Over', 48, -200, '#ffe1f0', '600');
     drawCenteredText(ctx, `Score: ${this._score}`, 28, -70, '#f7f9ff');
     drawCenteredText(ctx, `Best: ${this._best}`, 20, -10, '#c8d5ff');
@@ -765,6 +1218,7 @@ Scenes.GAME_OVER = {
           SceneManager.enter('MENU');
           break;
         case 'KeyM':
+          SoundFX.play('toggle');
           toggleMute();
           break;
         default:
@@ -779,6 +1233,22 @@ Scenes.GAME_OVER = {
     }
   }
 };
+function renderWorld(ctx, state, options = {}) {
+  const { overlayAlpha = 0, showHUD = true } = options;
+  const elapsed = state?.elapsed ?? VisualState.globalTime;
+  drawBackdrop(ctx, overlayAlpha, elapsed, VisualState.lastScrollSpeed);
+  drawPillars(ctx, state?.pillars ?? []);
+  drawMeteors(ctx, state?.meteors ?? []);
+  drawFireballs(ctx, state?.fireballs ?? []);
+  Particles.draw(ctx, state?.particles ?? [], 'world');
+  if (state?.dragon) {
+    drawDragon(ctx, state.dragon);
+  }
+  if (showHUD) {
+    drawHUD(ctx, state ?? GameState);
+  }
+  Particles.draw(ctx, state?.particles ?? [], 'hud');
+}
 
 function formatReason(reason) {
   switch (reason) {
@@ -795,24 +1265,21 @@ function formatReason(reason) {
   }
 }
 
-function drawBackdrop(ctx, overlayAlpha = 0) {
+function drawBackdrop(ctx, overlayAlpha = 0, timeSeconds = VisualState.globalTime, scrollHint = VisualState.lastScrollSpeed) {
   ctx.save();
   const gradient = ctx.createLinearGradient(0, 0, 0, CONFIG.height);
-  gradient.addColorStop(0, '#11244a');
-  gradient.addColorStop(0.4, '#1d2f57');
-  gradient.addColorStop(1, '#291a2c');
+  gradient.addColorStop(0, '#0e1a36');
+  gradient.addColorStop(0.42, '#1a2f55');
+  gradient.addColorStop(1, '#2a1a33');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, CONFIG.width, CONFIG.height);
 
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.18)';
-  for (let i = 0; i < 18; i += 1) {
-    const px = (i * 53) % CONFIG.width;
-    const py = (i * 97) % 320;
-    ctx.fillRect(px, py, 2, 2);
-  }
-
-  ctx.fillStyle = 'rgba(18, 12, 28, 0.85)';
-  ctx.fillRect(0, CONFIG.groundY, CONFIG.width, CONFIG.height - CONFIG.groundY);
+  drawNebula(ctx, timeSeconds);
+  drawStarfield(ctx, timeSeconds, scrollHint);
+  drawRidge(ctx, timeSeconds, scrollHint, 0.18, CONFIG.groundY - 220, '#1c2745');
+  drawRidge(ctx, timeSeconds, scrollHint, 0.32, CONFIG.groundY - 120, '#222c53');
+  drawRidge(ctx, timeSeconds, scrollHint, 0.52, CONFIG.groundY - 60, '#2a3564');
+  drawGround(ctx, timeSeconds, scrollHint);
 
   if (overlayAlpha > 0) {
     ctx.fillStyle = `rgba(3, 6, 12, ${overlayAlpha})`;
@@ -821,6 +1288,60 @@ function drawBackdrop(ctx, overlayAlpha = 0) {
   ctx.restore();
 }
 
+function drawNebula(ctx, timeSeconds) {
+  const wobble = Math.sin(timeSeconds * 0.25 + VisualState.twinkleSeed) * 20;
+  ctx.save();
+  ctx.translate(wobble, 0);
+  for (const color of CONFIG.backdrop.nebulaColors) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.ellipse(CONFIG.width * 0.35, CONFIG.groundY - 420, 240, 140, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawStarfield(ctx, timeSeconds, scrollHint) {
+  const scroll = (scrollHint * 0.45 + 26) * timeSeconds;
+  for (const star of VisualState.stars) {
+    const offsetX = wrapValue(star.baseX - scroll * star.depth, -120, CONFIG.width + 120);
+    const twinkle = Math.sin(timeSeconds * (1.4 + star.depth) + star.twinkle) * 0.35 + 0.65;
+    const alpha = 0.22 + 0.6 * twinkle;
+    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+    ctx.fillRect(offsetX, star.baseY + Math.sin(timeSeconds * 0.6 + star.twinkle) * 4 * (1 - star.depth), star.size, star.size);
+  }
+}
+
+function drawRidge(ctx, timeSeconds, scrollHint, parallax, baseY, color) {
+  const scroll = (scrollHint * parallax + 16) * timeSeconds;
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(0, CONFIG.height);
+  const width = CONFIG.width;
+  for (let x = -40; x <= width + 40; x += 20) {
+    const phase = (x + scroll) * 0.01;
+    const y = baseY + Math.sin(phase) * 28 * parallax + Math.cos(phase * 0.7) * 18 * parallax;
+    ctx.lineTo(x, y);
+  }
+  ctx.lineTo(CONFIG.width, CONFIG.height);
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawGround(ctx, timeSeconds, scrollHint) {
+  const height = CONFIG.height - CONFIG.groundY;
+  ctx.fillStyle = '#151021';
+  ctx.fillRect(0, CONFIG.groundY, CONFIG.width, height);
+
+  const tile = 24;
+  const offset = wrapValue(-(scrollHint * 0.8 + 36) * timeSeconds, 0, tile);
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+  for (let x = -tile + offset; x < CONFIG.width + tile; x += tile) {
+    ctx.fillRect(Math.round(x), CONFIG.groundY - 4, 10, 4);
+  }
+}
 function drawDragon(ctx, dragon) {
   if (!dragon) {
     return;
@@ -892,14 +1413,14 @@ function drawPillars(ctx, pillars) {
     if (topHeight > 0) {
       ctx.fillStyle = pillarGradient;
       ctx.fillRect(pillar.x, 0, pillar.width, topHeight);
-      ctx.fillStyle = '#1a2541';
+      ctx.fillStyle = 'rgba(18, 28, 52, 0.85)';
       ctx.fillRect(pillar.x - 4, topHeight - 14, pillar.width + 8, 14);
     }
 
     if (bottomHeight > 0) {
       ctx.fillStyle = pillarGradient;
       ctx.fillRect(pillar.x, bottomY, pillar.width, bottomHeight);
-      ctx.fillStyle = '#1a2541';
+      ctx.fillStyle = 'rgba(18, 28, 52, 0.85)';
       ctx.fillRect(pillar.x - 4, bottomY, pillar.width + 8, 14);
     }
   }
@@ -952,7 +1473,7 @@ function drawFireballs(ctx, fireballs) {
   ctx.restore();
 }
 
-function drawHUD(ctx) {
+function drawHUD(ctx, state) {
   ctx.save();
   ctx.fillStyle = 'rgba(9, 14, 27, 0.55)';
   ctx.fillRect(18, 20, 150, 60);
@@ -964,7 +1485,7 @@ function drawHUD(ctx) {
 
   ctx.font = "600 32px 'Segoe UI', Tahoma, sans-serif";
   ctx.textAlign = 'center';
-  ctx.fillText(String(GameState.score).padStart(1, '0'), CONFIG.width / 2, 50);
+  ctx.fillText(String(state.score).padStart(1, '0'), CONFIG.width / 2, 50);
 
   ctx.font = "600 18px 'Segoe UI', Tahoma, sans-serif";
   ctx.textAlign = 'left';
@@ -972,11 +1493,11 @@ function drawHUD(ctx) {
   ctx.fillText(isMuted ? 'Muted' : 'Sound On', 28, 110);
 
   ctx.textAlign = 'right';
-  ctx.fillText(GameState.fireCooldown <= 0 ? 'Fire Ready' : 'Fire Cooling', CONFIG.width - 28, 44);
-  ctx.fillText(`Time ${GameState.elapsed.toFixed(1)}s`, CONFIG.width - 28, 110);
+  ctx.fillText(state.fireCooldown <= 0 ? 'Fire Ready' : 'Fire Cooling', CONFIG.width - 28, 44);
+  ctx.fillText(`Time ${state.elapsed?.toFixed(1) ?? '0.0'}s`, CONFIG.width - 28, 110);
   ctx.restore();
 
-  drawFireButton(ctx, UI_LAYOUT.fireButton, UIState.fireButtonPressed, GameState.fireCooldown <= 0);
+  drawFireButton(ctx, UI_LAYOUT.fireButton, UIState.fireButtonPressed, state.fireCooldown <= 0);
 }
 
 function drawFireButton(ctx, circle, pressed, ready) {
@@ -1072,7 +1593,6 @@ function drawCenteredText(ctx, text, size, offsetY, color, weight = '500') {
   ctx.fillText(text, CONFIG.width / 2, CONFIG.height / 2 + offsetY);
   ctx.restore();
 }
-
 function dispatchInput(payload) {
   SceneManager.handleInput(payload);
 }
@@ -1081,11 +1601,15 @@ window.addEventListener('keydown', (event) => {
   if (['Space', 'ArrowUp', 'ArrowDown'].includes(event.code)) {
     event.preventDefault();
   }
+  SoundFX.unlock();
   dispatchInput({ type: 'key', code: event.code, raw: event });
 });
 
 function handlePointerEvent(event, phase) {
   const coords = translateToCanvas(event);
+  if (phase === 'down') {
+    SoundFX.unlock();
+  }
   dispatchInput({
     type: 'pointer',
     phase,
@@ -1093,7 +1617,7 @@ function handlePointerEvent(event, phase) {
     ...coords,
     raw: event
   });
-  if (phase === 'down' || event.target === canvas) {
+  if ((phase === 'down' || event.target === canvas) && typeof event.preventDefault === 'function') {
     event.preventDefault();
   }
 }
@@ -1137,6 +1661,7 @@ function gameLoop(now) {
   const deltaSeconds = Math.min((now - lastFrame) / 1000, CONFIG.maxDeltaTime);
   lastFrame = now;
 
+  VisualState.globalTime = wrapValue(VisualState.globalTime + deltaSeconds, 0, 1000);
   SceneManager.update(deltaSeconds);
   SceneManager.draw(context);
 
@@ -1145,4 +1670,3 @@ function gameLoop(now) {
 
 SceneManager.enter('BOOT');
 requestAnimationFrame(gameLoop);
-
