@@ -18,12 +18,14 @@ This backlog captures high-level gameplay ideas that build on the current Phase 
 
 ## Detailed Notes
 ### Realm Gates Campaign Flow (High)
+- **Ticket:** See `docs/tickets/phase6-high-priority.md#ticket-realm-gates-campaign-flow` for detailed scope.
 - **Player Impact:** Layer short handcrafted stages (“gates”) with unique hazard mixes, concluding in a score bonus or relic that persists into endless mode.
 - **Design Notes:** Curate 5–7 gate themes (e.g., tight fortress, meteor storm, low visibility). Successful completion unlocks the next gate and increases base difficulty in endless runs.
 - **Implementation Sketch:** Reuse scene system to introduce a lightweight campaign state machine, gate definitions (JSON), and reward hooks that modify CONFIG ramps.
 - **Dependencies:** Requires save-slot extension in `Persistence` for gate progress and reward flags.
 
 ### Elemental Power-Ups & Resource Loop (High)
+- **Ticket:** See `docs/tickets/phase6-high-priority.md#ticket-elemental-power-ups--resource-loop` for detailed scope.
 - **Player Impact:** Drop temporary boosts (e.g., Flame Surge for wider fireball, Aegis Shield for one-hit protection, Wind Glyph for slower gravity) that demand positioning choices.
 - **Design Notes:** Gate power-up spawns behind a resource like “ember shards” collected from meteors, encouraging offensive play.
 - **Implementation Sketch:** Extend `GameState` with collectible counters, add power-up entities with timers, and surface UI badges in HUD.
