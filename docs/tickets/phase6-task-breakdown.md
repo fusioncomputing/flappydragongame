@@ -1,0 +1,53 @@
+# Phase 6 Task Breakdown
+
+_Last updated: 2025-09-28_
+
+This worksheet decomposes the two high-priority Phase 6 tickets into granular engineering tasks with suggested issue titles, size estimates, and owner notes. Each subsection also captures cross-functional follow-ups for design and analytics so we can socialise assumptions before scheduling work.
+
+## Realm Gates Campaign Flow
+- **Epic Reference:** `docs/tickets/phase6-high-priority.md#ticket-realm-gates-campaign-flow`
+- **Design Partner:** TBD (request sign-off on gate themes & relic catalogue)
+- **Analytics Partner:** TBD (define retention dashboards + gate funnel events)
+
+### Proposed Issues
+| Area | Issue Title | Size | Notes |
+| --- | --- | --- | --- |
+| Data Model | "Implement CampaignState loader & gate definitions" | M | JSON schema, migration, persistence hooks |
+| Gameplay Systems | "Support per-gate CONFIG overrides" | S | Inject modifiers before scene enter |
+| Gameplay Systems | "Add relic reward pipeline" | M | Buff application + endless integration |
+| UI/UX | "Build campaign select screen with gate cards" | M | Menu scene + touch interactions |
+| UI/UX | "Add in-run gate objective banner" | S | Display progress + completion callout |
+| FX/Audio | "Create gate-specific audio/particle cues" | S | Optional polish; reuse existing systems |
+| QA | "Author campaign regression checklist & smoke test" | S | Documented cases + minimal automation |
+| Analytics | "Instrument gate funnel and relic usage events" | S | Emit to telemetry, verify payloads |
+
+### Cross-Team Follow-ups
+- **Design Sync:** Need final list of gate types, difficulty curves, and relic effects. Schedule workshop before sprint selection.
+- **Analytics Sync:** Confirm dashboards for Gate completion (%) and relic adoption; define guardrails for D3 retention uplift target.
+
+## Elemental Power-Ups & Resource Loop
+- **Epic Reference:** `docs/tickets/phase6-high-priority.md#ticket-elemental-power-ups--resource-loop`
+- **Design Partner:** TBD (validate power-up durations & shard economy)
+- **Analytics Partner:** TBD (define kill-rate metric & session length target)
+
+### Proposed Issues
+| Area | Issue Title | Size | Notes |
+| --- | --- | --- | --- |
+| Data Model | "Introduce ember shard resource & persistence" | S | Update GameState + storage |
+| Gameplay Systems | "Implement PowerUpManager with timers" | M | Handles activation, expiry, stacking rules |
+| Gameplay Systems | "Hook meteor kills to shard drops" | S | Balance constant via CONFIG |
+| Gameplay Systems | "Implement Flame Surge / Aegis Shield / Wind Glyph effects" | L | Combine physics tweaks + visuals |
+| UI/UX | "Display power-up HUD badges & timers" | S | HUD update, accessibility review |
+| FX/Audio | "Create power-up pickup and expiry cues" | S | Particles + SoundFX cues |
+| Settings | "Add power-up toggle & assist flags" | S | Settings persistence + menu entry |
+| QA | "Power-up regression & performance checklist" | S | Manual test plan; watch for perf hits |
+| Analytics | "Instrument shard gains, power-up activation, run modifiers" | S | Telemetry fields + validation |
+
+### Cross-Team Follow-ups
+- **Design Sync:** Align on shard drop rates, power-up durations, and fail-safe behaviour (e.g., stacking rules) before implementation begins.
+- **Analytics Sync:** Ensure dashboards capture meteor kill rate, average shards spent/run, and session duration changes post-launch.
+
+## Next Actions
+1. Create tracker issues for each task (matching titles above) once project management tooling is ready.
+2. Assign design/analytics POCs to unblock outstanding questions noted per epic.
+3. Re-evaluate sizes after technical discovery or prototype spikes if scope changes.

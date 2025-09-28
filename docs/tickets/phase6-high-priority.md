@@ -2,7 +2,7 @@
 
 _Last updated: 2025-09-28_
 
-These tickets expand the two high-priority gameplay initiatives from the backlog into concrete, actionable work items. Each ticket outlines goals, player impact, scoped engineering tasks, and acceptance criteria to accelerate grooming once v1.0.0 is signed off.
+These tickets expand the two high-priority gameplay initiatives from the backlog into concrete, actionable work items. Each ticket outlines goals, player impact, scoped engineering tasks, and acceptance criteria to accelerate grooming once v1.0.0 is signed off. See `docs/tickets/phase6-task-breakdown.md` for granular issue sizing and cross-team follow-ups.
 
 ## Ticket: Realm Gates Campaign Flow
 - **Backlog Reference:** `docs/feature-backlog.md` → Realm Gates campaign flow (High)

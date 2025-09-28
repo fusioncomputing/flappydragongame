@@ -51,5 +51,6 @@ Progress is logged via small commits to `main` tied to each phase to keep the tr
 
 ## Post-launch Feature Backlog
 - Refer to `docs/feature-backlog.md` for prioritized gameplay enhancements (campaign flow, power-ups, elite hazards, and more).
+- Use `docs/tickets/phase6-task-breakdown.md` to spin up engineering issues once Phase 6 begins.
 - Reassess priorities after the v1.0.0 QA pass and initial telemetry to decide which items graduate into Phase 6.
 - Treat high-priority backlog items as the seed for a Phase 6 roadmap once release readiness is confirmed.
