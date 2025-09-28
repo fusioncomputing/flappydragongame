@@ -194,11 +194,57 @@ const CAMPAIGN_INDEX = CAMPAIGN_CONFIG.gates.reduce((map, gate) => {
 }, Object.create(null));
 
 const CampaignState = (() => {
+  function createBlankProgress() {
+    return {
+      cleared: false,
+      bestScore: 0,
+      objectiveProgress: Object.create(null)
+    };
+  }
+
+  function sanitizeObjectiveProgress(source) {
+    if (!source || typeof source !== 'object') {
+      return Object.create(null);
+    }
+    const clean = Object.create(null);
+    for (const [key, value] of Object.entries(source)) {
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        clean[key] = value;
+      }
+    }
+    return clean;
+  }
+
   let runtime = {
     activeGateId: null,
     gateProgress: Object.create(null),
     unlockedRewards: []
   };
+
+  function hydrate(snapshot) {
+    if (!snapshot || typeof snapshot !== 'object') {
+      return;
+    }
+    runtime.activeGateId = typeof snapshot.activeGateId === 'string' && CAMPAIGN_INDEX[snapshot.activeGateId]
+      ? snapshot.activeGateId
+      : null;
+    runtime.gateProgress = Object.create(null);
+    if (snapshot.gateProgress && typeof snapshot.gateProgress === 'object') {
+      for (const [gateId, record] of Object.entries(snapshot.gateProgress)) {
+        if (!CAMPAIGN_INDEX[gateId] || !record || typeof record !== 'object') {
+          continue;
+        }
+        runtime.gateProgress[gateId] = {
+          cleared: record.cleared === true,
+          bestScore: Number.isFinite(record.bestScore) ? Math.max(0, record.bestScore) : 0,
+          objectiveProgress: sanitizeObjectiveProgress(record.objectiveProgress)
+        };
+      }
+    }
+    runtime.unlockedRewards = Array.isArray(snapshot.unlockedRewards)
+      ? snapshot.unlockedRewards.filter((id) => typeof id === 'string')
+      : [];
+  }
 
   function getGate(id) {
     return CAMPAIGN_INDEX[id] || null;
@@ -208,8 +254,53 @@ const CampaignState = (() => {
     return CAMPAIGN_CONFIG.gates;
   }
 
+  function getActiveGateId() {
+    return runtime.activeGateId;
+  }
+
+  function getActiveGate() {
+    return runtime.activeGateId ? getGate(runtime.activeGateId) : null;
+  }
+
+  function ensureProgressRecord(id) {
+    if (!runtime.gateProgress[id]) {
+      runtime.gateProgress[id] = createBlankProgress();
+    }
+    return runtime.gateProgress[id];
+  }
+
+  function getGateProgress(id) {
+    const record = runtime.gateProgress[id];
+    if (!record) {
+      return {
+        cleared: false,
+        bestScore: 0,
+        objectiveProgress: {}
+      };
+    }
+    return {
+      cleared: record.cleared === true,
+      bestScore: record.bestScore ?? 0,
+      objectiveProgress: { ...record.objectiveProgress }
+    };
+  }
+
+  function isGateUnlocked(id) {
+    const index = CAMPAIGN_CONFIG.gates.findIndex((gate) => gate.id === id);
+    if (index === -1) {
+      return false;
+    }
+    if (index === 0) {
+      return true;
+    }
+    const previousGate = CAMPAIGN_CONFIG.gates[index - 1];
+    const progress = runtime.gateProgress[previousGate.id];
+    return !!(progress && progress.cleared);
+  }
+
   function setActiveGate(id) {
-    if (!getGate(id)) {
+    const gate = getGate(id);
+    if (!gate || !isGateUnlocked(id)) {
       return false;
     }
     runtime.activeGateId = id;
@@ -220,31 +311,20 @@ const CampaignState = (() => {
     runtime.activeGateId = null;
   }
 
-  function ensureProgressRecord(id) {
-    if (!runtime.gateProgress[id]) {
-      runtime.gateProgress[id] = {
-        cleared: false,
-        bestScore: 0,
-        objectiveProgress: Object.create(null)
-      };
-    }
-    return runtime.gateProgress[id];
-  }
-
   function recordGateResult(id, payload = {}) {
     const gate = getGate(id);
     if (!gate) {
       return;
     }
     const record = ensureProgressRecord(id);
-    if (typeof payload.bestScore === 'number') {
+    if (typeof payload.bestScore === 'number' && Number.isFinite(payload.bestScore)) {
       record.bestScore = Math.max(record.bestScore, payload.bestScore);
     }
     if (payload.cleared === true) {
       record.cleared = true;
     }
     if (payload.objectiveProgress) {
-      record.objectiveProgress = Object.assign(Object.create(null), payload.objectiveProgress);
+      record.objectiveProgress = sanitizeObjectiveProgress(payload.objectiveProgress);
     }
     if (payload.rewardUnlocked && gate.reward) {
       if (!runtime.unlockedRewards.includes(gate.reward.id)) {
@@ -253,12 +333,24 @@ const CampaignState = (() => {
     }
   }
 
+  function getUnlockedRewards() {
+    return [...runtime.unlockedRewards];
+  }
+
   function getRuntimeSnapshot() {
-    return {
+    const snapshot = {
       activeGateId: runtime.activeGateId,
-      gateProgress: JSON.parse(JSON.stringify(runtime.gateProgress || {})),
+      gateProgress: {},
       unlockedRewards: [...runtime.unlockedRewards]
     };
+    for (const [gateId, record] of Object.entries(runtime.gateProgress)) {
+      snapshot.gateProgress[gateId] = {
+        cleared: record.cleared === true,
+        bestScore: record.bestScore ?? 0,
+        objectiveProgress: { ...record.objectiveProgress }
+      };
+    }
+    return snapshot;
   }
 
   function resetRuntime() {
@@ -273,14 +365,19 @@ const CampaignState = (() => {
     config: CAMPAIGN_CONFIG,
     listGates,
     getGate,
+    getActiveGateId,
+    getActiveGate,
+    getGateProgress,
+    getUnlockedRewards,
+    isGateUnlocked,
     setActiveGate,
     clearActiveGate,
     recordGateResult,
     getRuntimeSnapshot,
-    resetRuntime
+    resetRuntime,
+    hydrate
   };
 })();
-
 let bestScore = 0;
 let isMuted = false;
 
@@ -883,10 +980,15 @@ function spawnPillarPair(initial = false) {
   const spacingMin = CONFIG.pillar.spacingMinX - 42 * eased;
   const spacingMax = CONFIG.pillar.spacingMaxX - 58 * eased;
   const spacing = randomRange(spacingMin, spacingMax);
-  const spawnOffset = initial ? randomRange(180, 240) : randomRange(90, 160);
+  const spawnOffset = initial ? randomRange(240, 320) : randomRange(110, 170);
+  const previous = GameState.pillars.length > 0 ? GameState.pillars[GameState.pillars.length - 1] : null;
+  const trailingEdge = previous ? previous.x + previous.width : CONFIG.width;
+  const targetSpawnX = trailingEdge + spacing;
+  const spawnX = Math.max(CONFIG.width + spawnOffset, targetSpawnX);
+  const actualSpacing = spawnX - trailingEdge;
 
   GameState.pillars.push({
-    x: CONFIG.width + spawnOffset,
+    x: spawnX,
     width: CONFIG.pillar.width,
     gapCenter,
     gapSize,
@@ -894,14 +996,11 @@ function spawnPillarPair(initial = false) {
   });
 
   const minInterval = CONFIG.pillar.minInterval || 0;
-  const baseInterval = spacing / GameState.scrollSpeed;
-  let interval = Math.max(minInterval, baseInterval);
-  if (initial) {
-    const initialTarget = Math.max(minInterval, baseInterval * 0.55);
-    interval = Math.min(interval, initialTarget);
-  }
+  const baseInterval = actualSpacing / GameState.scrollSpeed;
+  const interval = Math.max(minInterval, baseInterval);
   GameState.timeUntilNextPillar = interval;
 }
+
 
 function spawnMeteor() {
   const eased = easeOutQuad(GameState.difficulty);
@@ -1108,7 +1207,7 @@ function attemptFire() {
     lifetime: CONFIG.fireball.lifetime,
     pierce: pierceCount
   });
-  GameState.fireCooldown = CONFIG.fireball.cooldown;
+  const cooldownMultiplier = GameState.campaignModifiers?.fireballCooldownMultiplier ?? 1;\n  GameState.fireCooldown = CONFIG.fireball.cooldown * cooldownMultiplier;
   SoundFX.play('fire');
 }
 
@@ -1713,8 +1812,25 @@ Scenes.BOOT = {
 Scenes.MENU = {
   enter() {
     this._pulse = 0;
-    this.startRect = createButtonRect(CONFIG.width / 2 - 140, CONFIG.height / 2 - 60, 280, 74);
-    this.muteRect = createButtonRect(CONFIG.width / 2 - 140, CONFIG.height / 2 + 32, 280, 58);
+    this.hoverGateId = null;
+    this.activeGateId = CampaignState.getActiveGateId();
+
+    const leftX = 40;
+    this.startRect = createButtonRect(leftX, CONFIG.height / 2 - 90, 200, 74);
+    this.muteRect = createButtonRect(leftX, CONFIG.height / 2 + 12, 200, 58);
+
+    const gates = CampaignState.listGates();
+    const cardWidth = 220;
+    const cardHeight = 82;
+    const spacing = 14;
+    const totalHeight = gates.length * cardHeight + Math.max(0, gates.length - 1) * spacing;
+    const baseY = Math.max(120, (CONFIG.height / 2) - totalHeight / 2);
+    const cardX = CONFIG.width - cardWidth - 48;
+
+    this.campaignCards = gates.map((gate, index) => ({
+      gateId: gate.id,
+      rect: createButtonRect(cardX, baseY + index * (cardHeight + spacing), cardWidth, cardHeight)
+    }));
   },
   update(dt) {
     this._pulse = (this._pulse + dt) % 2.4;
@@ -1722,47 +1838,126 @@ Scenes.MENU = {
   draw(ctx) {
     drawBackdrop(ctx);
     drawCenteredText(ctx, 'Flappy Dragon', 52, -220, '#f7f3ff', '700');
-    drawCenteredText(ctx, `Best score: ${bestScore}`, 22, -150, '#d8e0ff');
-    drawCenteredText(ctx, 'Space / Enter to start • M to mute', 18, 150, '#aeb8e6');
+    drawCenteredText(ctx, 'Best score: ' + bestScore, 22, -150, '#d8e0ff');
+    drawCenteredText(ctx, 'Space / Enter to start | M to mute', 18, 150, '#aeb8e6');
 
-    drawButton(ctx, this.startRect, 'Play');
-    drawButton(ctx, this.muteRect, isMuted ? 'Unmute' : 'Mute', { active: isMuted });
+    drawButton(ctx, this.startRect, 'Play Endless');
+    drawButton(ctx, this.muteRect, isMuted ? 'Unmute' : 'Mute', { active: isMuted, subtle: true });
 
     if (this._pulse < 1.2) {
-      drawCenteredText(ctx, 'Tap anywhere to flap • Tap FIRE to shoot', 16, 210, '#8fa2d9');
+      drawCenteredText(ctx, 'Tap anywhere to flap | Tap FIRE to shoot', 16, 210, '#8fa2d9');
     }
+
+    ctx.save();
+    ctx.fillStyle = '#c9d4ff';
+    ctx.font = "500 16px 'Segoe UI', Tahoma, sans-serif";
+    ctx.textAlign = 'left';
+    ctx.fillText('Press C to jump into the next gate', this.startRect.x, this.muteRect.y + this.muteRect.height + 28);
+    ctx.restore();
+
+    drawCampaignPanel(ctx, this.campaignCards, this.hoverGateId, this.activeGateId);
   },
   handleInput(input) {
     if (input.type === 'key') {
-      if (input.raw?.repeat && ['Space', 'Enter', 'KeyM'].includes(input.code)) {
+      if (input.raw?.repeat && ['Space', 'Enter', 'KeyM', 'KeyC'].includes(input.code)) {
         return;
       }
-
       switch (input.code) {
         case 'Space':
         case 'Enter':
-          SoundFX.play('select');
-          SceneManager.enter('PLAY');
+          this.startEndless();
           break;
         case 'KeyM':
           SoundFX.play('toggle');
           toggleMute();
           break;
+        case 'KeyC': {
+          const gateId = this.findDefaultGateId();
+          if (gateId) {
+            this.launchGate(gateId);
+          } else {
+            SoundFX.play('toggle');
+          }
+          break;
+        }
         default:
           break;
       }
-    } else if (input.type === 'pointer' && input.phase === 'down') {
-      if (isPointInRect(input.x, input.y, this.startRect)) {
-        SoundFX.play('select');
-        SceneManager.enter('PLAY');
-      } else if (isPointInRect(input.x, input.y, this.muteRect)) {
-        SoundFX.play('toggle');
-        toggleMute();
+      return;
+    }
+
+    if (input.type === 'pointer') {
+      if (input.phase === 'move') {
+        this.updateGateHover(input.x, input.y);
+      }
+      if (input.phase === 'down') {
+        if (isPointInRect(input.x, input.y, this.startRect)) {
+          this.startEndless();
+          return;
+        }
+        if (isPointInRect(input.x, input.y, this.muteRect)) {
+          SoundFX.play('toggle');
+          toggleMute();
+          return;
+        }
+        const gateId = this.findGateAt(input.x, input.y);
+        if (gateId) {
+          this.launchGate(gateId);
+          return;
+        }
+      }
+      if (input.phase === 'cancel' || input.phase === 'up') {
+        this.updateGateHover(input.x, input.y);
       }
     }
+  },
+  updateGateHover(x, y) {
+    this.hoverGateId = this.findGateAt(x, y);
+  },
+  findGateAt(x, y) {
+    if (!this.campaignCards) {
+      return null;
+    }
+    for (const card of this.campaignCards) {
+      if (isPointInRect(x, y, card.rect)) {
+        return card.gateId;
+      }
+    }
+    return null;
+  },
+  findDefaultGateId() {
+    const gates = CampaignState.listGates();
+    let fallback = null;
+    for (const gate of gates) {
+      if (!CampaignState.isGateUnlocked(gate.id)) {
+        break;
+      }
+      const progress = CampaignState.getGateProgress(gate.id);
+      if (!progress.cleared) {
+        return gate.id;
+      }
+      fallback = gate.id;
+    }
+    return fallback;
+  },
+  startEndless() {
+    CampaignState.clearActiveGate();
+    Persistence.saveCampaignState(CampaignState.getRuntimeSnapshot());
+    this.activeGateId = null;
+    SoundFX.play('select');
+    SceneManager.enter('PLAY');
+  },
+  launchGate(gateId) {
+    if (!CampaignState.setActiveGate(gateId)) {
+      SoundFX.play('toggle');
+      return;
+    }
+    this.activeGateId = gateId;
+    Persistence.saveCampaignState(CampaignState.getRuntimeSnapshot());
+    SoundFX.play('select');
+    SceneManager.enter('PLAY', { campaignGateId: gateId });
   }
-};
-Scenes.PLAY = {
+};Scenes.PLAY = {
   enter(data) {
     if (data && data.resume) {
       GameState.runActive = true;
@@ -1770,6 +1965,35 @@ Scenes.PLAY = {
       GameState.pendingFire = false;
       return;
     }
+
+    const persistedGateId = CampaignState.getActiveGateId();
+    const requestedGateId = data?.campaignGateId || persistedGateId;
+    let activeGate = null;
+
+    if (requestedGateId && CampaignState.isGateUnlocked(requestedGateId)) {
+      CampaignState.setActiveGate(requestedGateId);
+      activeGate = CampaignState.getGate(requestedGateId);
+    }
+
+    if (activeGate) {
+      GameState.campaignGateId = activeGate.id;
+      GameState.campaignModifiers = buildCampaignModifiers(activeGate);
+      GameState.campaignObjective = activeGate.objective ? { ...activeGate.objective } : null;
+      GameState.campaignObjectiveProgress = Object.create(null);
+      WeatherSystem.setPreferredState(GameState.campaignModifiers.weatherBias);
+      Persistence.saveCampaignState(CampaignState.getRuntimeSnapshot());
+    } else {
+      if (persistedGateId) {
+        CampaignState.clearActiveGate();
+        Persistence.saveCampaignState(CampaignState.getRuntimeSnapshot());
+      }
+      GameState.campaignGateId = null;
+      GameState.campaignModifiers = null;
+      GameState.campaignObjective = null;
+      GameState.campaignObjectiveProgress = Object.create(null);
+      WeatherSystem.setPreferredState(null);
+    }
+
     resetGameState();
     SoundFX.play('start');
   },
@@ -1800,15 +2024,12 @@ Scenes.PLAY = {
         case 'KeyF':
           requestFire();
           break;
-        case 'KeyP':
-          SceneManager.enter('PAUSE', { resumeScene: 'PLAY' });
-          break;
-        case 'Escape':
-          SceneManager.enter('MENU');
-          break;
         case 'KeyM':
           SoundFX.play('toggle');
           toggleMute();
+          break;
+        case 'KeyP':
+          SceneManager.enter('PAUSE', { resumeScene: 'PLAY' });
           break;
         default:
           break;
@@ -1838,9 +2059,7 @@ Scenes.PLAY = {
       SceneManager.enter('PAUSE', { resumeScene: 'PLAY' });
     }
   }
-};
-
-Scenes.PAUSE = {
+};\nScenes.PAUSE = {
   enter() {
     this._blink = 0;
     this.resumeRect = createButtonRect(CONFIG.width / 2 - 140, CONFIG.height / 2 - 30, 280, 64);
@@ -1952,6 +2171,190 @@ Scenes.GAME_OVER = {
     }
   }
 };
+function describeGateObjective(objective) {
+  if (!objective || typeof objective !== 'object') {
+    return 'Complete the gate';
+  }
+  const parts = [];
+  if (Number.isFinite(objective.targetScore)) {
+    parts.push('Score ' + objective.targetScore);
+  }
+  if (Number.isFinite(objective.meteorKills)) {
+    parts.push(objective.meteorKills + ' meteor kills');
+  }
+  if (Number.isFinite(objective.flawlessSegments)) {
+    parts.push(objective.flawlessSegments + ' flawless segments');
+  }
+  if (Number.isFinite(objective.shardCollection)) {
+    parts.push('Collect ' + objective.shardCollection + ' shards');
+  }
+  return parts.length > 0 ? parts.join(' | ') : 'Complete the gate';
+}
+
+function drawCampaignPanel(ctx, cards, hoverGateId, activeGateId) {
+  if (!Array.isArray(cards) || cards.length === 0) {
+    return;
+  }
+  const panelPadding = 24;
+  const firstRect = cards[0].rect;
+  const lastRect = cards[cards.length - 1].rect;
+  const panelX = firstRect.x - panelPadding;
+  const panelY = firstRect.y - (panelPadding + 12);
+  const panelWidth = firstRect.width + panelPadding * 2;
+  const panelHeight = (lastRect.y + lastRect.height) - panelY + panelPadding;
+
+  ctx.save();
+  ctx.beginPath();
+  roundedRectPath(ctx, panelX, panelY, panelWidth, panelHeight, 20);
+  ctx.fillStyle = 'rgba(16, 24, 44, 0.72)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(58, 74, 120, 0.6)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.save();
+  ctx.fillStyle = '#dce4ff';
+  ctx.font = "600 20px 'Segoe UI', Tahoma, sans-serif";
+  ctx.textAlign = 'left';
+  ctx.fillText('Realm Gates Campaign', panelX + 18, panelY + 34);
+  ctx.restore();
+
+  for (const card of cards) {
+    const gate = CampaignState.getGate(card.gateId);
+    if (!gate) {
+      continue;
+    }
+    const progress = CampaignState.getGateProgress(gate.id);
+    const unlocked = CampaignState.isGateUnlocked(gate.id);
+    const cleared = progress.cleared;
+    const active = gate.id === activeGateId;
+    const hovered = gate.id === hoverGateId;
+    const rect = card.rect;
+
+    let fill = 'rgba(32, 46, 82, 0.78)';
+    if (!unlocked) {
+      fill = 'rgba(22, 28, 48, 0.55)';
+    } else if (cleared) {
+      fill = 'rgba(58, 118, 88, 0.82)';
+    } else if (active || hovered) {
+      fill = 'rgba(94, 146, 232, 0.9)';
+    }
+
+    ctx.save();
+    ctx.beginPath();
+    roundedRectPath(ctx, rect.x, rect.y, rect.width, rect.height, 16);
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.strokeStyle = active ? 'rgba(218, 236, 255, 0.9)' : 'rgba(40, 54, 92, 0.75)';
+    ctx.lineWidth = active ? 3 : 2;
+    ctx.stroke();
+
+    ctx.font = "600 18px 'Segoe UI', Tahoma, sans-serif";
+    ctx.textAlign = 'left';
+    ctx.fillStyle = unlocked ? '#f6f8ff' : '#b5bdd4';
+    ctx.fillText(gate.label, rect.x + 14, rect.y + 24);
+
+    if (progress.bestScore > 0) {
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#c8d6ff';
+      ctx.font = "500 12px 'Segoe UI', Tahoma, sans-serif";
+      ctx.fillText('Best ' + progress.bestScore, rect.x + rect.width - 14, rect.y + 24);
+    }
+
+    ctx.textAlign = 'left';
+    ctx.font = "400 13px 'Segoe UI', Tahoma, sans-serif";
+    ctx.fillStyle = unlocked ? '#d1dcff' : '#8f98b2';
+    ctx.fillText(gate.summary, rect.x + 14, rect.y + 42);
+
+    ctx.fillStyle = unlocked ? '#b8c8ff' : '#7f86a0';
+    ctx.fillText(describeGateObjective(gate.objective), rect.x + 14, rect.y + 60);
+
+    const rewardLabel = gate.reward && gate.reward.label ? gate.reward.label : 'TBD Reward';
+    ctx.fillStyle = cleared ? '#b5f0c9' : unlocked ? '#f9e5b8' : '#9da4ba';
+    ctx.fillText(rewardLabel, rect.x + 14, rect.y + rect.height - 14);
+
+    const statusText = !unlocked ? 'Locked' : cleared ? 'Cleared' : active ? 'Active' : 'Ready';
+    ctx.textAlign = 'right';
+    ctx.fillStyle = cleared ? '#d2f7df' : '#dbe4ff';
+    ctx.font = "500 13px 'Segoe UI', Tahoma, sans-serif";
+    ctx.fillText(statusText, rect.x + rect.width - 14, rect.y + rect.height - 14);
+
+    if (!unlocked) {
+      ctx.fillStyle = 'rgba(18, 24, 38, 0.55)';
+      roundedRectPath(ctx, rect.x, rect.y, rect.width, rect.height, 16);
+      ctx.fill();
+      ctx.fillStyle = '#9aa4c2';
+      ctx.textAlign = 'center';
+      ctx.font = "600 14px 'Segoe UI', Tahoma, sans-serif";
+      ctx.fillText('Locked', rect.x + rect.width / 2, rect.y + rect.height / 2);
+    }
+    ctx.restore();
+  }
+}
+function buildCampaignModifiers(gate) {
+  const source = gate && typeof gate === 'object' ? gate.modifiers || {} : {};
+  const modifiers = Object.create(null);
+  modifiers.weatherBias = typeof source.weatherBias === 'string' ? source.weatherBias : null;
+  modifiers.scrollSpeedMultiplier = Number.isFinite(source.scrollSpeedMultiplier)
+    ? Math.max(0.5, source.scrollSpeedMultiplier)
+    : 1;
+  modifiers.meteorIntervalMultiplier = Number.isFinite(source.meteorIntervalMultiplier)
+    ? Math.max(0.2, source.meteorIntervalMultiplier)
+    : 1;
+  modifiers.fireballCooldownMultiplier = Number.isFinite(source.fireballCooldownMultiplier)
+    ? Math.max(0.2, source.fireballCooldownMultiplier)
+    : 1;
+  modifiers.gapMinOverride = Number.isFinite(source.gapMinOverride)
+    ? Math.max(120, source.gapMinOverride)
+    : null;
+  modifiers.pillarSpacingMinOverride = Number.isFinite(source.pillarSpacingMinOverride)
+    ? Math.max(180, source.pillarSpacingMinOverride)
+    : null;
+  modifiers.fogOverlay = Number.isFinite(source.fogOverlay)
+    ? clamp(source.fogOverlay, 0, 1)
+    : 0;
+  return modifiers;
+}
+function formatReason(reason) {
+  switch (reason) {
+    case 'pillar':
+      return 'Crashed into a pillar';
+    case 'meteor':
+      return 'Struck by a meteor';
+    case 'ground':
+      return 'Hit the ground';
+    case 'ceiling':
+      return 'Flew too high';
+    default:
+      return 'Fate unknown';
+  }
+\n
+
+function buildCampaignModifiers(gate) {
+  const source = gate && typeof gate === 'object' ? gate.modifiers || {} : {};
+  const modifiers = Object.create(null);
+  modifiers.weatherBias = typeof source.weatherBias === 'string' ? source.weatherBias : null;
+  modifiers.scrollSpeedMultiplier = Number.isFinite(source.scrollSpeedMultiplier)
+    ? Math.max(0.5, source.scrollSpeedMultiplier)
+    : 1;
+  modifiers.meteorIntervalMultiplier = Number.isFinite(source.meteorIntervalMultiplier)
+    ? Math.max(0.2, source.meteorIntervalMultiplier)
+    : 1;
+  modifiers.fireballCooldownMultiplier = Number.isFinite(source.fireballCooldownMultiplier)
+    ? Math.max(0.2, source.fireballCooldownMultiplier)
+    : 1;
+  modifiers.gapMinOverride = Number.isFinite(source.gapMinOverride)
+    ? Math.max(120, source.gapMinOverride)
+    : null;
+  modifiers.pillarSpacingMinOverride = Number.isFinite(source.pillarSpacingMinOverride)
+    ? Math.max(180, source.pillarSpacingMinOverride)
+    : null;
+  modifiers.fogOverlay = Number.isFinite(source.fogOverlay)
+    ? clamp(source.fogOverlay, 0, 1)
+    : 0;
+  return modifiers;
+}
 function renderWorld(ctx, state, options = {}) {
   const { overlayAlpha = 0, showHUD = true } = options;
   const elapsed = state?.elapsed ?? VisualState.globalTime;
@@ -1983,6 +2386,59 @@ function formatReason(reason) {
     default:
       return 'Fate unknown';
   }
+\n
+    ctx.save();
+    ctx.beginPath();
+    roundedRectPath(ctx, rect.x, rect.y, rect.width, rect.height, 16);
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.strokeStyle = active ? 'rgba(218, 236, 255, 0.9)' : 'rgba(40, 54, 92, 0.75)';
+    ctx.lineWidth = active ? 3 : 2;
+    ctx.stroke();
+
+    ctx.font = "600 18px 'Segoe UI', Tahoma, sans-serif";
+    ctx.textAlign = 'left';
+    ctx.fillStyle = unlocked ? '#f6f8ff' : '#b5bdd4';
+    ctx.fillText(gate.label, rect.x + 14, rect.y + 24);
+
+    if (progress.bestScore > 0) {
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#c8d6ff';
+      ctx.font = "500 12px 'Segoe UI', Tahoma, sans-serif";
+      ctx.fillText(Best , rect.x + rect.width - 14, rect.y + 24);
+    }
+
+    ctx.textAlign = 'left';
+    ctx.font = "400 13px 'Segoe UI', Tahoma, sans-serif";
+    ctx.fillStyle = unlocked ? '#d1dcff' : '#8f98b2';
+    ctx.fillText(gate.summary, rect.x + 14, rect.y + 42);
+
+    ctx.fillStyle = unlocked ? '#b8c8ff' : '#7f86a0';
+    ctx.fillText(describeGateObjective(gate.objective), rect.x + 14, rect.y + 60);
+
+    const rewardLabel = gate.reward?.label ?? 'TBD Reward';
+    ctx.fillStyle = cleared ? '#b5f0c9' : unlocked ? '#f9e5b8' : '#9da4ba';
+    ctx.fillText(rewardLabel, rect.x + 14, rect.y + rect.height - 14);
+
+    const statusText = !unlocked ? 'Locked' : cleared ? 'Cleared' : active ? 'Active' : 'Ready';
+    ctx.textAlign = 'right';
+    ctx.fillStyle = cleared ? '#d2f7df' : '#dbe4ff';
+    ctx.font = "500 13px 'Segoe UI', Tahoma, sans-serif";
+    ctx.fillText(statusText, rect.x + rect.width - 14, rect.y + rect.height - 14);
+
+    if (!unlocked) {
+      ctx.fillStyle = 'rgba(18, 24, 38, 0.55)';
+      roundedRectPath(ctx, rect.x, rect.y, rect.width, rect.height, 16);
+      ctx.fill();
+      ctx.fillStyle = '#9aa4c2';
+      ctx.textAlign = 'center';
+      ctx.font = "600 14px 'Segoe UI', Tahoma, sans-serif";
+      ctx.fillText('Locked', rect.x + rect.width / 2, rect.y + rect.height / 2);
+    }
+    ctx.restore();
+  }
+}
+\n
 }
 
 function drawBackdrop(ctx, overlayAlpha = 0, timeSeconds = VisualState.globalTime, scrollHint = VisualState.lastScrollSpeed) {
@@ -2477,3 +2933,33 @@ function gameLoop(now) {
 
 SceneManager.enter('BOOT');
 requestAnimationFrame(gameLoop);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
