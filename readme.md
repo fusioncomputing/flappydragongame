@@ -143,6 +143,8 @@ Manual QA should cover:
 - Run through the Testing Checklist on desktop and mobile portrait viewports.
 - Update `CHANGELOG.md` and tag `v1.0.0` once QA passes.
 
+Progress tracker: see `docs/release-checklist.md` for current status and QA notes.
+
 ## Changelog
 
 See `CHANGELOG.md` for a human-curated release history. The 1.0.0 entry captures the Phase 4 polish milestone.
