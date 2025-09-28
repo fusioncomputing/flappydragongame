@@ -8,7 +8,7 @@ _Last updated: 2025-09-27_
 | 0 | Foundations (tooling, repo, workflow) | Complete |
 | 1 | Core scaffolding (canvas, scenes, input plumbing) | Complete |
 | 2 | Gameplay systems (dragon, pillars, meteors, fireballs) | Core loop implemented |
-| 3 | UX and controls polish (menus, overlays, persistence) | Pending |
+| 3 | UX and controls polish (menus, overlays, persistence) | Complete |
 | 4 | Audio, art, and moment-to-moment polish | Pending |
 | 5 | QA, performance, release documentation | Pending |
 
@@ -29,16 +29,16 @@ _Last updated: 2025-09-27_
 - [x] Fireball system with cooldown, lifespan, and overlap checks versus meteors.
 - [ ] Difficulty tuning, particle feedback, and spawn balancing passes.
 
-## Phase 3 - UX and Controls (Pending)
-- Menu UI with Start, Controls tooltip, Mute toggle; hook to SceneManager transitions.
-- Pause overlay toggled by `P`, includes resume prompt and dimmed playfield.
-- Game Over panel (score, best, Play Again, Leave) with persistence in `localStorage`.
-- On-screen fire button and mobile-friendly flap tap region; pointer + keyboard unification.
+## Phase 3 - UX and Controls (Complete)
+- [x] Menu UI with Play button, controls tooltip, and persistent mute toggle.
+- [x] Pause overlay with resume/leave buttons, dimmed playfield, and mute shortcut.
+- [x] Game Over panel with score, best, cause summary, Play Again and Leave interactions.
+- [x] On-screen FIRE button plus tap-to-flap handling; keyboard/mouse parity retained.
 
 ## Phase 4 - Audio and Polish (Pending)
 - Asset loader to preload sprites/audio; geometric fallback if assets missing.
 - Background parallax, ground strip, particle flourishes for fireball/meteor impacts.
-- Mute state persistence, focus/blur pause handling, responsive letterboxing review.
+- Integrate mute toggle with audio playback, add soundscape, and refine responsive letterboxing.
 
 ## Phase 5 - QA and Release (Pending)
 - Manual regression checklist aligned with README test section (flap responsiveness, fairness, spawn cadence, persistence).

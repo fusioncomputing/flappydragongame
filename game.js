@@ -38,10 +38,12 @@ const CONFIG = Object.freeze({
 });
 
 const STORAGE_KEYS = Object.freeze({
-  bestScore: 'flappy-dragon-best-score'
+  bestScore: 'flappy-dragon-best-score',
+  muted: 'flappy-dragon-muted'
 });
 
 let bestScore = 0;
+let isMuted = false;
 
 const canvas = document.getElementById('gameCanvas');
 const context = canvas.getContext('2d', { alpha: false });
@@ -107,7 +109,25 @@ const Persistence = (() => {
     }
   }
 
-  return { loadBestScore, saveBestScore };
+  function loadMuted() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.muted);
+      return raw === 'true';
+    } catch (error) {
+      console.warn('Unable to read mute setting:', error);
+      return false;
+    }
+  }
+
+  function saveMuted(value) {
+    try {
+      localStorage.setItem(STORAGE_KEYS.muted, value ? 'true' : 'false');
+    } catch (error) {
+      console.warn('Unable to persist mute setting:', error);
+    }
+  }
+
+  return { loadBestScore, saveBestScore, loadMuted, saveMuted };
 })();
 
 const GameState = {
@@ -123,6 +143,19 @@ const GameState = {
   pendingFlap: false,
   pendingFire: false,
   runActive: false
+};
+
+const UI_LAYOUT = Object.freeze({
+  fireButton: Object.freeze({
+    centerX: CONFIG.width - 90,
+    centerY: CONFIG.height - 110,
+    radius: 48
+  })
+});
+
+const UIState = {
+  firePointers: new Set(),
+  fireButtonPressed: false
 };
 
 function resetGameState() {
@@ -144,6 +177,9 @@ function resetGameState() {
   GameState.timeUntilNextPillar = 0;
   GameState.timeUntilNextMeteor = CONFIG.meteor.spawnIntervalStart;
   GameState.runActive = true;
+
+  UIState.firePointers.clear();
+  UIState.fireButtonPressed = false;
 
   spawnPillarPair(true);
 }
@@ -241,6 +277,10 @@ function updatePlayState(dt) {
   if (GameState.pendingFire) {
     attemptFire();
     GameState.pendingFire = false;
+  }
+
+  if (GameState.fireCooldown <= 0 && UIState.firePointers.size > 0) {
+    attemptFire();
   }
 
   if (updateDragon(dt)) {
@@ -425,6 +465,21 @@ function circlesOverlap(x1, y1, r1, x2, y2, r2) {
   return dx * dx + dy * dy <= radius * radius;
 }
 
+function isPointInRect(x, y, rect) {
+  return x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height;
+}
+
+function isPointInCircle(x, y, circle) {
+  const dx = x - circle.centerX;
+  const dy = y - circle.centerY;
+  return dx * dx + dy * dy <= circle.radius * circle.radius;
+}
+
+function toggleMute() {
+  isMuted = !isMuted;
+  Persistence.saveMuted(isMuted);
+}
+
 const Scenes = {};
 
 const SceneManager = (() => {
@@ -479,6 +534,7 @@ Scenes.BOOT = {
   enter() {
     AssetLoader.loadAll().then(() => {
       bestScore = Persistence.loadBestScore();
+      isMuted = Persistence.loadMuted();
       SceneManager.enter('MENU');
     });
   },
@@ -494,30 +550,48 @@ Scenes.BOOT = {
 Scenes.MENU = {
   enter() {
     this._pulse = 0;
+    this.startRect = createButtonRect(CONFIG.width / 2 - 140, CONFIG.height / 2 - 60, 280, 74);
+    this.muteRect = createButtonRect(CONFIG.width / 2 - 140, CONFIG.height / 2 + 32, 280, 58);
   },
   update(dt) {
     this._pulse = (this._pulse + dt) % 2.4;
   },
   draw(ctx) {
     drawBackdrop(ctx);
-    drawCenteredText(ctx, 'Flappy Dragon', 50, -220, '#f7f3ff', '700');
-    drawCenteredText(ctx, `Best score: ${bestScore}`, 20, -150, '#d8e0ff');
-    drawCenteredText(ctx, 'Press Space / Tap to Start', 24, -40, '#d8e0ff');
-    drawCenteredText(ctx, 'F shoots fireballs • P pauses', 18, 20, '#aeb8e6');
+    drawCenteredText(ctx, 'Flappy Dragon', 52, -220, '#f7f3ff', '700');
+    drawCenteredText(ctx, `Best score: ${bestScore}`, 22, -150, '#d8e0ff');
+    drawCenteredText(ctx, 'Space / Enter to start • M to mute', 18, 150, '#aeb8e6');
+
+    drawButton(ctx, this.startRect, 'Play');
+    drawButton(ctx, this.muteRect, isMuted ? 'Unmute' : 'Mute', { active: isMuted });
+
     if (this._pulse < 1.2) {
-      drawCenteredText(ctx, 'Avoid pillars, meteors, and the ground!', 16, 120, '#8fa2d9');
+      drawCenteredText(ctx, 'Tap anywhere to flap • Tap FIRE to shoot', 16, 210, '#8fa2d9');
     }
   },
   handleInput(input) {
-    if (input.type === 'key' && (input.code === 'Space' || input.code === 'Enter')) {
-      if (input.raw?.repeat) {
+    if (input.type === 'key') {
+      if (input.raw?.repeat && ['Space', 'Enter', 'KeyM'].includes(input.code)) {
         return;
       }
-      SceneManager.enter('PLAY');
-    }
 
-    if (input.type === 'pointer' && input.phase === 'down') {
-      SceneManager.enter('PLAY');
+      switch (input.code) {
+        case 'Space':
+        case 'Enter':
+          SceneManager.enter('PLAY');
+          break;
+        case 'KeyM':
+          toggleMute();
+          break;
+        default:
+          break;
+      }
+    } else if (input.type === 'pointer' && input.phase === 'down') {
+      if (isPointInRect(input.x, input.y, this.startRect)) {
+        SceneManager.enter('PLAY');
+      } else if (isPointInRect(input.x, input.y, this.muteRect)) {
+        toggleMute();
+      }
     }
   }
 };
@@ -536,6 +610,8 @@ Scenes.PLAY = {
     GameState.runActive = false;
     GameState.pendingFlap = false;
     GameState.pendingFire = false;
+    UIState.firePointers.clear();
+    UIState.fireButtonPressed = false;
   },
   update(dt) {
     updatePlayState(dt);
@@ -550,7 +626,7 @@ Scenes.PLAY = {
   },
   handleInput(input) {
     if (input.type === 'key') {
-      if (input.raw?.repeat && (input.code === 'Space' || input.code === 'ArrowUp' || input.code === 'KeyF')) {
+      if (input.raw?.repeat && ['Space', 'ArrowUp', 'KeyF', 'KeyM'].includes(input.code)) {
         return;
       }
 
@@ -568,11 +644,33 @@ Scenes.PLAY = {
         case 'Escape':
           SceneManager.enter('MENU');
           break;
+        case 'KeyM':
+          toggleMute();
+          break;
         default:
           break;
       }
-    } else if (input.type === 'pointer' && input.phase === 'down') {
-      requestFlap();
+    } else if (input.type === 'pointer') {
+      if (input.phase === 'down') {
+        if (isPointInCircle(input.x, input.y, UI_LAYOUT.fireButton)) {
+          UIState.firePointers.add(input.pointerId);
+          UIState.fireButtonPressed = true;
+          requestFire();
+        } else {
+          requestFlap();
+        }
+      } else if (input.phase === 'move') {
+        if (UIState.firePointers.has(input.pointerId)) {
+          if (!isPointInCircle(input.x, input.y, UI_LAYOUT.fireButton)) {
+            UIState.firePointers.delete(input.pointerId);
+            UIState.fireButtonPressed = UIState.firePointers.size > 0;
+          }
+        }
+      } else if (input.phase === 'up' || input.phase === 'cancel') {
+        if (UIState.firePointers.delete(input.pointerId)) {
+          UIState.fireButtonPressed = UIState.firePointers.size > 0;
+        }
+      }
     } else if (input.type === 'system' && input.reason === 'visibility') {
       SceneManager.enter('PAUSE', { resumeScene: 'PLAY' });
     }
@@ -582,27 +680,46 @@ Scenes.PLAY = {
 Scenes.PAUSE = {
   enter() {
     this._blink = 0;
+    this.resumeRect = createButtonRect(CONFIG.width / 2 - 140, CONFIG.height / 2 - 30, 280, 64);
+    this.menuRect = createButtonRect(CONFIG.width / 2 - 140, CONFIG.height / 2 + 48, 280, 58);
   },
   update(dt) {
     this._blink = (this._blink + dt) % 1.6;
   },
   draw(ctx) {
     drawBackdrop(ctx, 0.35);
-    drawCenteredText(ctx, 'Paused', 40, -60, '#fefbff', '600');
+    drawCenteredText(ctx, 'Paused', 42, -120, '#fefbff', '600');
     if (this._blink < 0.8) {
-      drawCenteredText(ctx, 'Press P to resume', 20, 20, '#d2dbff');
+      drawCenteredText(ctx, 'Press P to resume • M to mute', 18, -50, '#d2dbff');
     }
-    drawCenteredText(ctx, 'Press Esc to return to menu', 18, 80, '#9aaade');
+    drawButton(ctx, this.resumeRect, 'Resume');
+    drawButton(ctx, this.menuRect, 'Leave', { subtle: true });
   },
   handleInput(input) {
     if (input.type === 'key') {
-      if (input.code === 'KeyP') {
-        SceneManager.enter('PLAY', { resume: true });
-      } else if (input.code === 'Escape') {
-        SceneManager.enter('MENU');
+      if (input.raw?.repeat && ['KeyP', 'Escape', 'KeyM'].includes(input.code)) {
+        return;
+      }
+
+      switch (input.code) {
+        case 'KeyP':
+          SceneManager.enter('PLAY', { resume: true });
+          break;
+        case 'Escape':
+          SceneManager.enter('MENU');
+          break;
+        case 'KeyM':
+          toggleMute();
+          break;
+        default:
+          break;
       }
     } else if (input.type === 'pointer' && input.phase === 'down') {
-      SceneManager.enter('PLAY', { resume: true });
+      if (isPointInRect(input.x, input.y, this.resumeRect)) {
+        SceneManager.enter('PLAY', { resume: true });
+      } else if (isPointInRect(input.x, input.y, this.menuRect)) {
+        SceneManager.enter('MENU');
+      }
     }
   }
 };
@@ -613,33 +730,52 @@ Scenes.GAME_OVER = {
     this._best = data?.best ?? bestScore;
     this._reason = data?.reason ?? 'unknown';
     this._pulse = 0;
+    this.playAgainRect = createButtonRect(CONFIG.width / 2 - 150, CONFIG.height / 2 + 30, 300, 66);
+    this.menuRect = createButtonRect(CONFIG.width / 2 - 150, CONFIG.height / 2 + 110, 300, 58);
   },
   update(dt) {
     this._pulse = (this._pulse + dt) % 2;
   },
   draw(ctx) {
     drawBackdrop(ctx, 0.15);
-    drawCenteredText(ctx, 'Game Over', 46, -180, '#ffe1f0', '600');
-    drawCenteredText(ctx, `Score: ${this._score}`, 28, -40, '#f7f9ff');
-    drawCenteredText(ctx, `Best: ${this._best}`, 20, 20, '#c8d5ff');
-    drawCenteredText(ctx, `Cause: ${formatReason(this._reason)}`, 16, 70, '#a7b6ef');
+    drawCenteredText(ctx, 'Game Over', 48, -200, '#ffe1f0', '600');
+    drawCenteredText(ctx, `Score: ${this._score}`, 28, -70, '#f7f9ff');
+    drawCenteredText(ctx, `Best: ${this._best}`, 20, -10, '#c8d5ff');
+    drawCenteredText(ctx, `Cause: ${formatReason(this._reason)}`, 16, 40, '#a7b6ef');
+
+    drawButton(ctx, this.playAgainRect, 'Play Again');
+    drawButton(ctx, this.menuRect, 'Leave', { subtle: true });
 
     if (this._pulse < 1) {
-      drawCenteredText(ctx, 'Press Space to play again', 18, 140, '#a6b7ee');
+      drawCenteredText(ctx, 'Space / Enter to retry • Esc to menu', 16, 200, '#a6b7ee');
     }
-    drawCenteredText(ctx, 'Press Esc to return to menu', 16, 190, '#90a4db');
   },
   handleInput(input) {
     if (input.type === 'key') {
-      if ((input.code === 'Space' || input.code === 'Enter') && !input.raw?.repeat) {
+      if (input.raw?.repeat && ['Space', 'Enter', 'Escape', 'KeyM'].includes(input.code)) {
+        return;
+      }
+
+      switch (input.code) {
+        case 'Space':
+        case 'Enter':
+          SceneManager.enter('PLAY');
+          break;
+        case 'Escape':
+          SceneManager.enter('MENU');
+          break;
+        case 'KeyM':
+          toggleMute();
+          break;
+        default:
+          break;
+      }
+    } else if (input.type === 'pointer' && input.phase === 'down') {
+      if (isPointInRect(input.x, input.y, this.playAgainRect)) {
         SceneManager.enter('PLAY');
-      } else if (input.code === 'Escape') {
+      } else if (isPointInRect(input.x, input.y, this.menuRect)) {
         SceneManager.enter('MENU');
       }
-    }
-
-    if (input.type === 'pointer' && input.phase === 'down') {
-      SceneManager.enter('PLAY');
     }
   }
 };
@@ -668,7 +804,6 @@ function drawBackdrop(ctx, overlayAlpha = 0) {
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, CONFIG.width, CONFIG.height);
 
-  // Stylized stars
   ctx.fillStyle = 'rgba(255, 255, 255, 0.18)';
   for (let i = 0; i < 18; i += 1) {
     const px = (i * 53) % CONFIG.width;
@@ -676,7 +811,6 @@ function drawBackdrop(ctx, overlayAlpha = 0) {
     ctx.fillRect(px, py, 2, 2);
   }
 
-  // Ground strip
   ctx.fillStyle = 'rgba(18, 12, 28, 0.85)';
   ctx.fillRect(0, CONFIG.groundY, CONFIG.width, CONFIG.height - CONFIG.groundY);
 
@@ -696,7 +830,6 @@ function drawDragon(ctx, dragon) {
   ctx.translate(dragon.x, dragon.y);
   ctx.rotate(dragon.rotation);
 
-  // Body
   const bodyGradient = ctx.createLinearGradient(-24, -20, 36, 20);
   bodyGradient.addColorStop(0, '#f94144');
   bodyGradient.addColorStop(0.5, '#f3722c');
@@ -706,7 +839,6 @@ function drawDragon(ctx, dragon) {
   ctx.ellipse(0, 0, 34, 22, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Wings
   ctx.fillStyle = '#f94144';
   ctx.beginPath();
   ctx.moveTo(-16, -6);
@@ -723,7 +855,6 @@ function drawDragon(ctx, dragon) {
   ctx.fillStyle = '#f3722c';
   ctx.fill();
 
-  // Eye
   ctx.fillStyle = '#1f1f2b';
   ctx.beginPath();
   ctx.arc(18, -6, 4, 0, Math.PI * 2);
@@ -734,7 +865,6 @@ function drawDragon(ctx, dragon) {
   ctx.arc(19, -7, 2, 0, Math.PI * 2);
   ctx.fill();
 
-  // Horn
   ctx.fillStyle = '#f9f1d7';
   ctx.beginPath();
   ctx.moveTo(10, -18);
@@ -758,9 +888,9 @@ function drawPillars(ctx, pillars) {
     pillarGradient.addColorStop(0, '#24375b');
     pillarGradient.addColorStop(0.5, '#2b4673');
     pillarGradient.addColorStop(1, '#24375b');
-    ctx.fillStyle = pillarGradient;
 
     if (topHeight > 0) {
+      ctx.fillStyle = pillarGradient;
       ctx.fillRect(pillar.x, 0, pillar.width, topHeight);
       ctx.fillStyle = '#1a2541';
       ctx.fillRect(pillar.x - 4, topHeight - 14, pillar.width + 8, 14);
@@ -825,23 +955,112 @@ function drawFireballs(ctx, fireballs) {
 function drawHUD(ctx) {
   ctx.save();
   ctx.fillStyle = 'rgba(9, 14, 27, 0.55)';
-  ctx.fillRect(18, 20, 150, 52);
-  ctx.fillRect(CONFIG.width - 168, 20, 150, 52);
+  ctx.fillRect(18, 20, 150, 60);
+  ctx.fillRect(CONFIG.width - 168, 20, 150, 60);
+  ctx.fillRect(18, 90, 150, 46);
 
   ctx.fillStyle = '#ffffff';
   ctx.textBaseline = 'middle';
 
   ctx.font = "600 32px 'Segoe UI', Tahoma, sans-serif";
   ctx.textAlign = 'center';
-  ctx.fillText(String(GameState.score).padStart(1, '0'), CONFIG.width / 2, 46);
+  ctx.fillText(String(GameState.score).padStart(1, '0'), CONFIG.width / 2, 50);
 
   ctx.font = "600 18px 'Segoe UI', Tahoma, sans-serif";
   ctx.textAlign = 'left';
-  ctx.fillText(`Best ${bestScore}`, 28, 46);
+  ctx.fillText(`Best ${bestScore}`, 28, 44);
+  ctx.fillText(isMuted ? 'Muted' : 'Sound On', 28, 110);
 
   ctx.textAlign = 'right';
-  ctx.fillText(GameState.fireCooldown <= 0 ? 'Fire Ready' : 'Fire Cooling', CONFIG.width - 28, 46);
+  ctx.fillText(GameState.fireCooldown <= 0 ? 'Fire Ready' : 'Fire Cooling', CONFIG.width - 28, 44);
+  ctx.fillText(`Time ${GameState.elapsed.toFixed(1)}s`, CONFIG.width - 28, 110);
   ctx.restore();
+
+  drawFireButton(ctx, UI_LAYOUT.fireButton, UIState.fireButtonPressed, GameState.fireCooldown <= 0);
+}
+
+function drawFireButton(ctx, circle, pressed, ready) {
+  ctx.save();
+  const gradient = ctx.createRadialGradient(
+    circle.centerX - 6,
+    circle.centerY - 6,
+    4,
+    circle.centerX,
+    circle.centerY,
+    circle.radius
+  );
+  if (pressed) {
+    gradient.addColorStop(0, '#ffbe76');
+    gradient.addColorStop(0.6, '#ff7b54');
+    gradient.addColorStop(1, '#ff5f40');
+  } else {
+    gradient.addColorStop(0, '#fff1c1');
+    gradient.addColorStop(0.6, '#f6c667');
+    gradient.addColorStop(1, '#f3722c');
+  }
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(circle.centerX, circle.centerY, circle.radius, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = ready ? 'rgba(255, 255, 255, 0.85)' : 'rgba(255, 255, 255, 0.35)';
+  ctx.lineWidth = ready ? 4 : 2;
+  ctx.beginPath();
+  ctx.arc(circle.centerX, circle.centerY, circle.radius - 2, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.fillStyle = ready ? '#101220' : 'rgba(16, 18, 32, 0.65)';
+  ctx.font = "700 18px 'Segoe UI', Tahoma, sans-serif";
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('FIRE', circle.centerX, circle.centerY);
+  ctx.restore();
+}
+
+function drawButton(ctx, rect, text, options = {}) {
+  const { active = false, subtle = false } = options;
+  ctx.save();
+  const radius = 16;
+
+  ctx.beginPath();
+  roundedRectPath(ctx, rect.x, rect.y, rect.width, rect.height, radius);
+  ctx.fillStyle = active
+    ? 'rgba(106, 172, 255, 0.85)'
+    : subtle
+      ? 'rgba(15, 24, 46, 0.78)'
+      : 'rgba(80, 102, 219, 0.9)';
+  ctx.fill();
+
+  ctx.beginPath();
+  roundedRectPath(ctx, rect.x, rect.y, rect.width, rect.height, radius);
+  ctx.strokeStyle = active ? 'rgba(219, 240, 255, 0.9)' : 'rgba(30, 42, 90, 0.7)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.fillStyle = active ? '#0b1324' : '#f5f7ff';
+  ctx.font = "600 24px 'Segoe UI', Tahoma, sans-serif";
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, rect.x + rect.width / 2, rect.y + rect.height / 2 + 1);
+  ctx.restore();
+}
+
+function createButtonRect(x, y, width, height) {
+  return { x, y, width, height };
+}
+
+function roundedRectPath(ctx, x, y, width, height, radius) {
+  const r = Math.min(radius, width / 2, height / 2);
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + width - r, y);
+  ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+  ctx.lineTo(x + width, y + height - r);
+  ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+  ctx.lineTo(x + r, y + height);
+  ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
 }
 
 function drawCenteredText(ctx, text, size, offsetY, color, weight = '500') {
@@ -865,17 +1084,26 @@ window.addEventListener('keydown', (event) => {
   dispatchInput({ type: 'key', code: event.code, raw: event });
 });
 
-canvas.addEventListener('pointerdown', (event) => {
+function handlePointerEvent(event, phase) {
   const coords = translateToCanvas(event);
-  dispatchInput({ type: 'pointer', phase: 'down', ...coords, raw: event });
-  event.preventDefault();
-});
+  dispatchInput({
+    type: 'pointer',
+    phase,
+    pointerId: event.pointerId,
+    ...coords,
+    raw: event
+  });
+  if (phase === 'down' || event.target === canvas) {
+    event.preventDefault();
+  }
+}
 
-canvas.addEventListener('pointerup', (event) => {
-  const coords = translateToCanvas(event);
-  dispatchInput({ type: 'pointer', phase: 'up', ...coords, raw: event });
-  event.preventDefault();
-});
+canvas.addEventListener('pointerdown', (event) => handlePointerEvent(event, 'down'));
+canvas.addEventListener('pointerup', (event) => handlePointerEvent(event, 'up'));
+canvas.addEventListener('pointermove', (event) => handlePointerEvent(event, 'move'));
+canvas.addEventListener('pointercancel', (event) => handlePointerEvent(event, 'cancel'));
+window.addEventListener('pointerup', (event) => handlePointerEvent(event, 'up'));
+window.addEventListener('pointercancel', (event) => handlePointerEvent(event, 'cancel'));
 
 canvas.addEventListener('contextmenu', (event) => {
   event.preventDefault();
@@ -917,3 +1145,4 @@ function gameLoop(now) {
 
 SceneManager.enter('BOOT');
 requestAnimationFrame(gameLoop);
+

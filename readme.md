@@ -17,14 +17,16 @@ A portrait-oriented HTML5 canvas game inspired by Flappy Bird. Guide a tenacious
 - [License](#license)
 
 ## Project Status
-- Core gameplay loop implemented: dragon physics, pillar hazards, meteors, fireballs, scoring, and best-score persistence.
-- Menu, pause, and game-over flows wired; Phase 3 (UX polish + mobile controls) is next up.
+- Core gameplay loop implemented: dragon physics, pillars, meteors, fireballs, scoring, and best-score persistence.
+- Phase 3 UX pass complete with start/menu buttons, pause overlays, mute toggle (persisted), and on-screen FIRE control.
 
 ## Features
 - Fixed virtual resolution (480x800) with responsive letterboxing.
 - Scene manager coordinating Boot, Menu, Play, Pause, and Game Over flows.
 - Dragon flight physics with flap impulse, gravity, collision detection, and tilt feedback.
 - Pillar spawning, meteor threats, and fireball projectiles with cooldown-limited shooting and bonus scoring.
+- Touch-first enhancements: on-screen FIRE button, tap-to-flap, and HUD indicators mirroring keyboard controls.
+- Persistent best-score and mute settings via `localStorage`.
 
 ## Tech Stack
 - HTML5 canvas + vanilla JavaScript (ES module style IIFE).
@@ -64,14 +66,15 @@ A portrait-oriented HTML5 canvas game inspired by Flappy Bird. Guide a tenacious
 - F: fireball (with cooldown)
 - P: pause or resume
 - Escape: leave to menu
-- Mouse or touch tap: flap (touch fire button will be added for mobile)
+- Mouse or touch tap: flap (tap to hold FIRE button for touch shooting)
+- M: toggle mute
 
 ## Game States
 - **BOOT**: preload assets, transition to Menu when ready.
-- **MENU**: show title, start button prompt, controls tooltip, mute toggle (coming soon).
+- **MENU**: title screen with Play and Mute buttons.
 - **PLAY**: active gameplay loop and scoring.
-- **PAUSE**: dimmed overlay, resume prompt, optional settings.
-- **GAME_OVER**: display score, personal best, Play Again and Leave buttons.
+- **PAUSE**: dimmed overlay, resume/leave buttons, mute shortcut.
+- **GAME_OVER**: display score, personal best, cause of failure, Play Again and Leave buttons.
 
 ## Core Systems Specification
 Key numbers that shape the moment-to-moment feel:
@@ -90,8 +93,8 @@ Collision fairness:
 High-level roadmap (full detail in `docs/development-plan.md`):
 1. **Phase 0 - Foundations**: Repo setup, tooling decisions, local server workflow (complete).
 2. **Phase 1 - Core Scaffolding**: Canvas bootstrap, scene manager, input plumbing (complete).
-3. **Phase 2 - Gameplay Systems**: Core gameplay loop implemented (dragon, pillars, meteors, fireball combat); tuning and polish remain.
-4. **Phase 3 - UX and Controls**: Menu overlays, pause UI, mobile controls, persistence enhancements.
+3. **Phase 2 - Gameplay Systems**: Core gameplay loop implemented (dragon, pillars, meteors, fireball combat); balancing and polish continue.
+4. **Phase 3 - UX and Controls**: Start/pause/game-over overlays, mute persistence, mobile controls (complete).
 5. **Phase 4 - Audio and Polish**: Asset loader wiring, particles, parallax, mute handling.
 6. **Phase 5 - QA and Release**: Regression checklist, performance passes, documentation finalization.
 
@@ -102,6 +105,7 @@ Manual QA should cover:
 - Single tap/press produces one flap impulse.
 - Dragon hitbox vs pillar edges behaves fairly.
 - Fire cooldown prevents spamming; meteors destroyed by fireballs consistently.
+- On-screen FIRE button responds to taps/holds and respects cooldown.
 - Score increments once per pillar pair; meteor bonus applies on confirmed hits.
 - Difficulty ramps with tighter gaps and faster spawns later in runs.
 - Canvas resizes without distortion; letterboxing stable.
