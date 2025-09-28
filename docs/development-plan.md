@@ -57,4 +57,10 @@ Progress is logged via small commits to `main` tied to each phase to keep the tr
 - Reassess priorities after the v1.0.0 QA pass and initial telemetry to decide which items graduate into Phase 6.
 - Treat high-priority backlog items as the seed for a Phase 6 roadmap once release readiness is confirmed.
 
+## Phase 6 - Campaign & Relics (In planning)
+- Realm Gates campaign scaffolding in progress; gating config and runtime state live in CampaignState.
+- Next steps: hook persistence, implement gate modifiers/objective tracking, and integrate relic rewards into Endless runs.
+
+
+
 

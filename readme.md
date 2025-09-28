@@ -140,6 +140,7 @@ High-level roadmap (full detail in `docs/development-plan.md`):
 5. **Phase 4 - Audio and Polish**: Web Audio cues, parallax backdrop, particle FX, and difficulty retune (complete).
 6. **Phase 5 - QA and Release**: Regression checklist, performance passes, documentation finalization (pending).
 7. **Post-launch Backlog**: Candidate gameplay expansions outlined in `docs/feature-backlog.md`.
+8. **Phase 6 - Campaign & Relics**: Realm Gates planning underway; see `docs/design/realm-gates-campaign.md`.
 
 Progress updates are committed to `main` after every milestone to keep trunk deployment-ready.
 
@@ -181,4 +182,6 @@ Trunk-based workflow on `main`. Push small, reviewed increments with descriptive
 
 ## License
 TBD.
+
+
 

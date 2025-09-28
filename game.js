@@ -141,6 +141,146 @@ const STORAGE_KEYS = Object.freeze({
   muted: 'flappy-dragon-muted'
 });
 
+const CAMPAIGN_CONFIG = Object.freeze({
+  id: 'realmGates',
+  label: 'Realm Gates Campaign',
+  description: 'Sequenced gates that remix hazards before Endless mode.',
+  gates: Object.freeze([
+    Object.freeze({
+      id: 'gate-1-sky-ruins',
+      label: 'Gate 1: Sky Ruins',
+      summary: 'Baseline warm-up with light storm modifiers and shard-focused reward.',
+      objective: Object.freeze({ targetScore: 10, meteorKills: 3 }),
+      modifiers: Object.freeze({
+        weatherBias: 'storm',
+        scrollSpeedMultiplier: 1.05,
+        gapMinOverride: 152,
+        meteorIntervalMultiplier: 0.92
+      }),
+      reward: Object.freeze({ type: 'relic', id: 'ember-sigil', label: 'Ember Sigil', effectSummary: '+1 shard on meteor kill' })
+    }),
+    Object.freeze({
+      id: 'gate-2-aurora-pass',
+      label: 'Gate 2: Aurora Pass',
+      summary: 'Visibility twists with aurora drift and precision pillars.',
+      objective: Object.freeze({ targetScore: 16, flawlessSegments: 2 }),
+      modifiers: Object.freeze({
+        weatherBias: 'aurora',
+        fogOverlay: 0.18,
+        gapMinOverride: 148,
+        fireballCooldownMultiplier: 1.1
+      }),
+      reward: Object.freeze({ type: 'relic', id: 'tail-wind-pendant', label: 'Tailwind Pendant', effectSummary: 'Start Endless runs with Wind Glyph active for 5s' })
+    }),
+    Object.freeze({
+      id: 'gate-3-ember-gale',
+      label: 'Gate 3: Ember Gale Run',
+      summary: 'High-pressure gauntlet with accelerated meteors and shard chases.',
+      objective: Object.freeze({ targetScore: 22, shardCollection: 12 }),
+      modifiers: Object.freeze({
+        weatherBias: 'sandstorm',
+        scrollSpeedMultiplier: 1.12,
+        meteorIntervalMultiplier: 0.78,
+        pillarSpacingMinOverride: 280
+      }),
+      reward: Object.freeze({ type: 'relic', id: 'meteor-brand', label: 'Meteor Brand', effectSummary: 'Fireball hits grant +1 score once per 8s window' })
+    })
+  ])
+});
+
+const CAMPAIGN_INDEX = CAMPAIGN_CONFIG.gates.reduce((map, gate) => {
+  map[gate.id] = gate;
+  return map;
+}, Object.create(null));
+
+const CampaignState = (() => {
+  let runtime = {
+    activeGateId: null,
+    gateProgress: Object.create(null),
+    unlockedRewards: []
+  };
+
+  function getGate(id) {
+    return CAMPAIGN_INDEX[id] || null;
+  }
+
+  function listGates() {
+    return CAMPAIGN_CONFIG.gates;
+  }
+
+  function setActiveGate(id) {
+    if (!getGate(id)) {
+      return false;
+    }
+    runtime.activeGateId = id;
+    return true;
+  }
+
+  function clearActiveGate() {
+    runtime.activeGateId = null;
+  }
+
+  function ensureProgressRecord(id) {
+    if (!runtime.gateProgress[id]) {
+      runtime.gateProgress[id] = {
+        cleared: false,
+        bestScore: 0,
+        objectiveProgress: Object.create(null)
+      };
+    }
+    return runtime.gateProgress[id];
+  }
+
+  function recordGateResult(id, payload = {}) {
+    const gate = getGate(id);
+    if (!gate) {
+      return;
+    }
+    const record = ensureProgressRecord(id);
+    if (typeof payload.bestScore === 'number') {
+      record.bestScore = Math.max(record.bestScore, payload.bestScore);
+    }
+    if (payload.cleared === true) {
+      record.cleared = true;
+    }
+    if (payload.objectiveProgress) {
+      record.objectiveProgress = Object.assign(Object.create(null), payload.objectiveProgress);
+    }
+    if (payload.rewardUnlocked && gate.reward) {
+      if (!runtime.unlockedRewards.includes(gate.reward.id)) {
+        runtime.unlockedRewards.push(gate.reward.id);
+      }
+    }
+  }
+
+  function getRuntimeSnapshot() {
+    return {
+      activeGateId: runtime.activeGateId,
+      gateProgress: JSON.parse(JSON.stringify(runtime.gateProgress || {})),
+      unlockedRewards: [...runtime.unlockedRewards]
+    };
+  }
+
+  function resetRuntime() {
+    runtime = {
+      activeGateId: null,
+      gateProgress: Object.create(null),
+      unlockedRewards: []
+    };
+  }
+
+  return {
+    config: CAMPAIGN_CONFIG,
+    listGates,
+    getGate,
+    setActiveGate,
+    clearActiveGate,
+    recordGateResult,
+    getRuntimeSnapshot,
+    resetRuntime
+  };
+})();
+
 let bestScore = 0;
 let isMuted = false;
 
