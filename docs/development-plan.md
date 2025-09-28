@@ -7,7 +7,7 @@ _Last updated: 2025-09-27_
 | ----- | ----- | ------ |
 | 0 | Foundations (tooling, repo, workflow) | Complete |
 | 1 | Core scaffolding (canvas, scenes, input plumbing) | Complete |
-| 2 | Gameplay systems (dragon, pillars, meteors, fireballs) | In progress |
+| 2 | Gameplay systems (dragon, pillars, meteors, fireballs) | Core loop implemented |
 | 3 | UX and controls polish (menus, overlays, persistence) | Pending |
 | 4 | Audio, art, and moment-to-moment polish | Pending |
 | 5 | QA, performance, release documentation | Pending |
@@ -22,11 +22,12 @@ _Last updated: 2025-09-27_
 - Implement CONFIG constants, scene registry shell, requestAnimationFrame loop stub, and resize handling.
 - Add lint-friendly structure (`'use strict'`, modular organization) ready for future expansion.
 
-## Phase 2 - Gameplay Systems (In progress)
-- Dragon physics model (gravity, impulse, clamped velocity, rotation hint) with collision circle data.
-- Pillar pair spawner with spacing randomization, pooling, and scoring triggers.
-- Meteor generator with variable speed, spawn cadence easing toward minimum, safe spawn band.
-- Fireball system with cooldown, lifespan, and overlap checks versus meteors.
+## Phase 2 - Gameplay Systems (Core loop implemented)
+- [x] Dragon physics model (gravity, impulse, clamped velocity, rotation hint) with collision circle data.
+- [x] Pillar pair spawner with spacing randomization, pooling, and scoring triggers.
+- [x] Meteor generator with variable speed, spawn cadence easing toward minimum, safe spawn band.
+- [x] Fireball system with cooldown, lifespan, and overlap checks versus meteors.
+- [ ] Difficulty tuning, particle feedback, and spawn balancing passes.
 
 ## Phase 3 - UX and Controls (Pending)
 - Menu UI with Start, Controls tooltip, Mute toggle; hook to SceneManager transitions.

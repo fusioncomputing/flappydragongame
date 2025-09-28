@@ -17,14 +17,14 @@ A portrait-oriented HTML5 canvas game inspired by Flappy Bird. Guide a tenacious
 - [License](#license)
 
 ## Project Status
-- Boot, Menu, Pause, and Game Over placeholder scenes are wired up with a resize-aware canvas and input dispatching.
-- Gameplay systems (dragon physics, obstacles, meteors, fireballs) are scheduled next per Phase 2 of the roadmap.
+- Core gameplay loop implemented: dragon physics, pillar hazards, meteors, fireballs, scoring, and best-score persistence.
+- Menu, pause, and game-over flows wired; Phase 3 (UX polish + mobile controls) is next up.
 
 ## Features
 - Fixed virtual resolution (480x800) with responsive letterboxing.
 - Scene manager coordinating Boot, Menu, Play, Pause, and Game Over flows.
-- Keyboard, mouse, and touch input abstraction ready for mobile controls.
-- Hooks for asset preloading with geometric fallbacks while art and audio are sourced.
+- Dragon flight physics with flap impulse, gravity, collision detection, and tilt feedback.
+- Pillar spawning, meteor threats, and fireball projectiles with cooldown-limited shooting and bonus scoring.
 
 ## Tech Stack
 - HTML5 canvas + vanilla JavaScript (ES module style IIFE).
@@ -90,8 +90,8 @@ Collision fairness:
 High-level roadmap (full detail in `docs/development-plan.md`):
 1. **Phase 0 - Foundations**: Repo setup, tooling decisions, local server workflow (complete).
 2. **Phase 1 - Core Scaffolding**: Canvas bootstrap, scene manager, input plumbing (complete).
-3. **Phase 2 - Gameplay Systems**: Dragon physics, pillars, meteors, fireballs, scoring.
-4. **Phase 3 - UX and Controls**: Menu overlays, pause UI, mobile controls, persistence.
+3. **Phase 2 - Gameplay Systems**: Core gameplay loop implemented (dragon, pillars, meteors, fireball combat); tuning and polish remain.
+4. **Phase 3 - UX and Controls**: Menu overlays, pause UI, mobile controls, persistence enhancements.
 5. **Phase 4 - Audio and Polish**: Asset loader wiring, particles, parallax, mute handling.
 6. **Phase 5 - QA and Release**: Regression checklist, performance passes, documentation finalization.
 
@@ -102,9 +102,10 @@ Manual QA should cover:
 - Single tap/press produces one flap impulse.
 - Dragon hitbox vs pillar edges behaves fairly.
 - Fire cooldown prevents spamming; meteors destroyed by fireballs consistently.
-- Score increments once per pillar pair; optional meteor bonus tracked correctly.
+- Score increments once per pillar pair; meteor bonus applies on confirmed hits.
 - Difficulty ramps with tighter gaps and faster spawns later in runs.
 - Canvas resizes without distortion; letterboxing stable.
+- Pause/resume flow preserves state without resetting.
 - Mute and best score persist via `localStorage`.
 
 ## Contributing
