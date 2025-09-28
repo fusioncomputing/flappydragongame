@@ -119,6 +119,7 @@ High-level roadmap (full detail in `docs/development-plan.md`):
 4. **Phase 3 - UX and Controls**: Start/pause/game-over overlays, mute persistence, mobile controls (complete).
 5. **Phase 4 - Audio and Polish**: Web Audio cues, parallax backdrop, particle FX, and difficulty retune (complete).
 6. **Phase 5 - QA and Release**: Regression checklist, performance passes, documentation finalization (pending).
+7. **Post-launch Backlog**: Candidate gameplay expansions outlined in `docs/feature-backlog.md`.
 
 Progress updates are committed to `main` after every milestone to keep trunk deployment-ready.
 
