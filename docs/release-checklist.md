@@ -1,6 +1,6 @@
 # Release Checklist Progress
 
-_Last updated: 2025-09-28_
+_Last updated: 2025-09-29_
 
 ## Checklist Status
 - [ ] Capture fresh menu, mid-run, and game-over screenshots and update `docs/media/`.
@@ -9,10 +9,13 @@ _Last updated: 2025-09-28_
 - [ ] Record a short gameplay GIF (5-8 seconds) covering flap, meteor hit, and scoring; replace the placeholder asset.
   - Current state: `docs/media/gameplay-loop-placeholder.gif` is a 2x2 animated marker.
   - Follow-up: Capture a real sequence, export an optimized GIF, and overwrite the placeholder.
+- [ ] Verify ember shard drops, orb spawns, and all elemental power-up effects (Flame Surge/Wind Glyph/Aegis Shield).
+- [ ] Confirm audio cues for mute toggles, power-up pickups, and shield pops respect the mute flag.
+- [ ] Stress-test dynamic weather transitions (visual blend + gameplay modifiers).
 - [ ] Run through the Testing Checklist on desktop and mobile portrait viewports.
   - Current state: Manual QA not yet executed for the release candidate. Use the table below to log runs.
 - [ ] Update `CHANGELOG.md` and tag `v1.0.0` once QA passes.
-  - Current state: `CHANGELOG.md` already contains the 1.0.0 entry. Git tag still pending—create it only after QA is complete.
+  - Current state: `CHANGELOG.md` already contains the 1.0.0 entry. Git tag still pending?create it only after QA is complete.
 
 ## QA Logging Template
 | Date | Tester | Device / Browser | Viewport | Notes |
@@ -22,4 +25,5 @@ _Last updated: 2025-09-28_
 Once the checklist items above are complete:
 1. `git tag -a v1.0.0 -m "v1.0.0"`
 2. `git push origin v1.0.0`
+
 

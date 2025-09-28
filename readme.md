@@ -12,6 +12,7 @@ A portrait-oriented HTML5 canvas game inspired by Flappy Bird. Guide a tenacious
 - [Controls](#controls)
 - [Game States](#game-states)
 - [Core Systems Specification](#core-systems-specification)
+- [Weather & Power-Ups](#weather--power-ups)
 - [Work Plan](#work-plan)
 - [Testing Checklist](#testing-checklist)
 - [Release Checklist](#release-checklist)
@@ -23,6 +24,7 @@ A portrait-oriented HTML5 canvas game inspired by Flappy Bird. Guide a tenacious
 - Core gameplay loop implemented: dragon physics, pillars, meteors, fireballs, scoring, and best-score persistence.
 - Phase 3 UX pass complete with start/menu buttons, pause overlays, mute toggle (persisted), and on-screen FIRE control.
 - Phase 4 audio & polish complete: Web Audio cues, parallax skyline, particle effects, and retuned difficulty curves.
+- Dynamic weather system and elemental power-up loop implemented (shards, buffs, and shield charges).
 
 ## Features
 - Fixed virtual resolution (480x800) with responsive letterboxing.
@@ -32,7 +34,9 @@ A portrait-oriented HTML5 canvas game inspired by Flappy Bird. Guide a tenacious
 - Touch-first enhancements: on-screen FIRE button, tap-to-flap, and HUD indicators mirroring keyboard controls.
 - Persistent best-score and mute settings via `localStorage`.
 - Layered parallax backdrop with animated starfield and responsive ground strip.
-- Lightweight Web Audio soundboard with mute persistence and first-input unlock.
+- Dynamic weather cycles and biome tints that gently adjust spawn cadence and visibility.
+- Lightweight Web Audio soundboard with mute persistence, first-input unlock, and cues for toggles, pickups, and shields.
+- Elemental power-ups fueled by ember shards (Flame Surge, Aegis Shield, Wind Glyph).
 - Particle bursts for crashes, meteor hits, and score pops tied to HUD feedback.
 
 ## Showcase
@@ -89,6 +93,7 @@ A portrait-oriented HTML5 canvas game inspired by Flappy Bird. Guide a tenacious
 - Mouse or touch tap: flap (tap to hold FIRE button for touch shooting)
 - M: toggle mute
 - First tap or key press unlocks audio cues (browser requirement).
+- Meteor kills grant ember shards; collect power-up orbs by flying through them.
 
 ## Game States
 
@@ -103,14 +108,29 @@ Key numbers that shape the moment-to-moment feel:
 - Dragon: x = 120, radius 22, gravity 1800, flap impulse vy = -520, max fall speed 900.
 - Pillars: width 90, scroll speed eases from 184 to 252 as difficulty rises, gaps contract from 218px toward a 140px floor, spacing starts at 260-340px and tightens late run.
 - Meteors: radius 14, base speed 240-360 with subtle drift, spawn cadence eases from 2.4s down to 0.85s.
-- Fireballs: speed 540, cooldown 0.28s, lifetime 2.0s, radius 10.
+- Fireballs: speed 540, cooldown 0.28s, lifetime 2.0s, radius 10 (Flame Surge increases radius & pierce).
+- Power-ups: ember shards drop from meteors (1 each), orb spawns every 6 shards, effects include Flame Surge (piercing fireballs), Aegis Shield (one-hit protection), and Wind Glyph (reduced gravity/scroll speed).
+- Weather cycle: clear, tempest, aurora, and ember gale states adjust pillar speed (+/-8%), meteor cadence, and gravity; transitions every ~35-55s.
 - Ground collision at y = 720; top bound collision ends the run.
 
 Collision fairness:
 - Dragon uses a forward-offset circle check.
 - Pillars rely on axis-aligned rectangles with a small fairness inset.
 - Meteors and fireballs use circle overlaps.
+- Aegis Shield power-up absorbs a lethal hit before consuming a charge.
 
+## Weather & Power-Ups
+### Weather Cycle
+- Clear, Tempest, Aurora Drift, and Ember Gale fronts ease in over ~35-55 seconds.
+- Each state blends backdrop gradients, star visibility, fog overlays, and difficulty multipliers.
+- Modifiers tweak pillar scroll speed, meteor spawn cadence, and gravity so runs feel dynamic but fair.
+
+### Elemental Power-Ups
+- Meteors drop ember shards; collecting six spawns an orb that tracks the scroll speed with gentle bobbing.
+- Flame Surge widens fireballs and grants pierce charges for sustained meteor clears.
+- Wind Glyph slims gravity and scroll speed while stretching meteor intervals for recovery windows.
+- Aegis Shield adds a shield charge that absorbs one lethal hit with dedicated particles and audio cues.
+- Pickups and shield pops ship with bespoke sound effects that respect mute persistence.
 ## Work Plan
 High-level roadmap (full detail in `docs/development-plan.md`):
 1. **Phase 0 - Foundations**: Repo setup, tooling decisions, local server workflow (complete).
@@ -137,6 +157,10 @@ Manual QA should cover:
 - Canvas resizes without distortion; letterboxing stays stable.
 - Pause/resume flow preserves state without resetting.
 - Mute and best score persist via `localStorage`.
+- Weather transitions (clear/tempest/aurora/gale) cycle smoothly and adjust difficulty modifiers.
+- Ember shards drop on meteor kills; orbs spawn at the correct threshold and despawn off-screen if missed.
+- Flame Surge expands fireballs and allows piercing hits while active; Wind Glyph lowers gravity/scroll speed for its duration.
+- Aegis Shield charges prevent one death and update HUD counts and particles.
 
 ## Release Checklist
 - Capture fresh menu, mid-run, and game-over screenshots and update `docs/media/`.
@@ -156,3 +180,9 @@ Trunk-based workflow on `main`. Push small, reviewed increments with descriptive
 
 ## License
 TBD.
+
+
+
+
+
+

@@ -1,6 +1,6 @@
 # Flappy Dragon Delivery Plan
 
-_Last updated: 2025-09-28_
+_Last updated: 2025-09-29_
 
 ## Phase Summary
 | Phase | Focus | Status |
@@ -40,6 +40,8 @@ _Last updated: 2025-09-28_
 - [x] Layered parallax backdrop with animated starfield and responsive ground strip.
 - [x] Particle flourishes for meteor impacts, crashes, and score pops.
 - [x] Retuned pillar gaps, scroll speed, and meteor cadence for a smoother difficulty curve.
+- [x] Dynamic weather cycle layering gradients, fog, and difficulty modifiers across clear/tempest/aurora/gale fronts.
+- [x] Elemental power-up economy with ember shards feeding Flame Surge, Wind Glyph, and Aegis Shield effects.
 
 ## Phase 5 - QA and Release (Pending)
 - Manual regression checklist aligned with README test section (flap responsiveness, fairness, spawn cadence, persistence).
@@ -54,3 +56,5 @@ Progress is logged via small commits to `main` tied to each phase to keep the tr
 - Use `docs/tickets/phase6-task-breakdown.md` to spin up engineering issues once Phase 6 begins.
 - Reassess priorities after the v1.0.0 QA pass and initial telemetry to decide which items graduate into Phase 6.
 - Treat high-priority backlog items as the seed for a Phase 6 roadmap once release readiness is confirmed.
+
+

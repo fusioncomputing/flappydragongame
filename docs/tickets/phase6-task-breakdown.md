@@ -1,10 +1,11 @@
 # Phase 6 Task Breakdown
 
-_Last updated: 2025-09-28_
+_Last updated: 2025-09-29_
 
 This worksheet decomposes the two high-priority Phase 6 tickets into granular engineering tasks with suggested issue titles, size estimates, and owner notes. Each subsection also captures cross-functional follow-ups for design and analytics so we can socialise assumptions before scheduling work.
 
 ## Realm Gates Campaign Flow
+- **Status:** Pending (awaiting greenlight).
 - **Epic Reference:** `docs/tickets/phase6-high-priority.md#ticket-realm-gates-campaign-flow`
 - **Design Partner:** TBD (request sign-off on gate themes & relic catalogue)
 - **Analytics Partner:** TBD (define retention dashboards + gate funnel events)
@@ -26,6 +27,7 @@ This worksheet decomposes the two high-priority Phase 6 tickets into granular en
 - **Analytics Sync:** Confirm dashboards for Gate completion (%) and relic adoption; define guardrails for D3 retention uplift target.
 
 ## Elemental Power-Ups & Resource Loop
+- **Status:** Implemented; tasks retained here for historical reference.
 - **Epic Reference:** `docs/tickets/phase6-high-priority.md#ticket-elemental-power-ups--resource-loop`
 - **Design Partner:** TBD (validate power-up durations & shard economy)
 - **Analytics Partner:** TBD (define kill-rate metric & session length target)
@@ -46,6 +48,7 @@ This worksheet decomposes the two high-priority Phase 6 tickets into granular en
 ### Cross-Team Follow-ups
 - **Design Sync:** Align on shard drop rates, power-up durations, and fail-safe behaviour (e.g., stacking rules) before implementation begins.
 - **Analytics Sync:** Ensure dashboards capture meteor kill rate, average shards spent/run, and session duration changes post-launch.
+- **Live Ops Prep:** Draft a post-launch tuning plan covering shard thresholds, buff durations, and audio mix ownership.
 
 ## Relic Crafting & Loadouts
 - **Epic Reference:** `docs/tickets/phase6-high-priority.md#ticket-relic-crafting--loadouts`
@@ -72,3 +75,4 @@ This worksheet decomposes the two high-priority Phase 6 tickets into granular en
 1. Create tracker issues for each task (matching titles above) once project management tooling is ready.
 2. Assign design/analytics POCs to unblock outstanding questions noted per epic.
 3. Re-evaluate sizes after technical discovery or prototype spikes if scope changes.
+

@@ -46,6 +46,92 @@ const CONFIG = Object.freeze({
       { count: 34, depth: 0.72, size: 2.8 }
     ],
     nebulaColors: ['rgba(118, 86, 199, 0.16)', 'rgba(64, 146, 198, 0.22)']
+  }),
+  weather: Object.freeze({
+    transitionDuration: 4,
+    states: Object.freeze([
+      Object.freeze({
+        id: 'clear',
+        label: 'Clear Skies',
+        duration: Object.freeze([40, 55]),
+        pillarSpeedMultiplier: 1,
+        meteorIntervalMultiplier: 1,
+        gravityMultiplier: 1,
+        gradient: Object.freeze({ top: '#0e1a36', mid: '#1a2f55', bottom: '#2a1a33' }),
+        overlayColor: 'rgba(0, 0, 0, 0)',
+        starOpacity: 1,
+        fogAlpha: 0
+      }),
+      Object.freeze({
+        id: 'storm',
+        label: 'Tempest',
+        duration: Object.freeze([32, 42]),
+        pillarSpeedMultiplier: 1.08,
+        meteorIntervalMultiplier: 0.78,
+        gravityMultiplier: 1.05,
+        gradient: Object.freeze({ top: '#1c2947', mid: '#253860', bottom: '#191d34' }),
+        overlayColor: 'rgba(36, 52, 86, 0.32)',
+        starOpacity: 0.65,
+        fogAlpha: 0.22
+      }),
+      Object.freeze({
+        id: 'aurora',
+        label: 'Aurora Drift',
+        duration: Object.freeze([36, 48]),
+        pillarSpeedMultiplier: 0.96,
+        meteorIntervalMultiplier: 1.08,
+        gravityMultiplier: 0.95,
+        gradient: Object.freeze({ top: '#182043', mid: '#243964', bottom: '#2f1f4a' }),
+        overlayColor: 'rgba(76, 140, 196, 0.28)',
+        starOpacity: 1.25,
+        fogAlpha: 0.12
+      }),
+      Object.freeze({
+        id: 'sandstorm',
+        label: 'Ember Gale',
+        duration: Object.freeze([34, 46]),
+        pillarSpeedMultiplier: 0.92,
+        meteorIntervalMultiplier: 0.9,
+        gravityMultiplier: 0.98,
+        gradient: Object.freeze({ top: '#44311d', mid: '#5d3b1f', bottom: '#2a1f18' }),
+        overlayColor: 'rgba(164, 96, 36, 0.32)',
+        starOpacity: 0.35,
+        fogAlpha: 0.26
+      })
+    ])
+  }),
+  powerUps: Object.freeze({
+    shardPerMeteor: 1,
+    spawnThreshold: 6,
+    orbRadius: 18,
+    orbSpeedOffset: 60,
+    maxActive: 2,
+    definitions: Object.freeze([
+      Object.freeze({
+        id: 'flameSurge',
+        label: 'Flame Surge',
+        duration: 8,
+        color: '#f97b5f',
+        fireballRadiusBonus: 6,
+        pierceCount: 2
+      }),
+      Object.freeze({
+        id: 'aegisShield',
+        label: 'Aegis Shield',
+        duration: 0,
+        shieldCharges: 1,
+        color: '#9ad7ff'
+      }),
+      Object.freeze({
+        id: 'windGlyph',
+        label: 'Wind Glyph',
+        duration: 7,
+        color: '#8ae6d6',
+        scrollMultiplier: 0.88,
+        gravityMultiplier: 0.85,
+        meteorIntervalMultiplier: 1.12
+      })
+    ])
   })
 });
 
@@ -163,6 +249,126 @@ function generateStarfield() {
   }
   return stars;
 }
+
+const WeatherSystem = (() => {
+  const states = CONFIG.weather.states;
+  const transitionDuration = CONFIG.weather.transitionDuration;
+  let activeIndex = 0;
+  let previousIndex = 0;
+  let stateTimer = 0;
+  let transitionTimer = 0;
+  let initialized = false;
+
+  function randomDurationFor(state) {
+    const range = state.duration || [40, 55];
+    return randomRange(range[0], range[1]);
+  }
+
+  function pickNextIndex(current) {
+    if (states.length <= 1) {
+      return current;
+    }
+    let next = Math.floor(Math.random() * states.length);
+    if (next === current) {
+      next = (next + 1) % states.length;
+    }
+    return next;
+  }
+
+  function ensureInit() {
+    if (initialized) {
+      return;
+    }
+    initialized = true;
+    activeIndex = 0;
+    previousIndex = 0;
+    stateTimer = randomDurationFor(states[activeIndex]);
+    transitionTimer = 0;
+  }
+
+  function update(dt) {
+    ensureInit();
+    if (transitionTimer > 0) {
+      transitionTimer = Math.max(0, transitionTimer - dt);
+    } else {
+      stateTimer -= dt;
+      if (stateTimer <= 0) {
+        previousIndex = activeIndex;
+        activeIndex = pickNextIndex(activeIndex);
+        stateTimer = randomDurationFor(states[activeIndex]);
+        transitionTimer = transitionDuration;
+      }
+    }
+  }
+
+  function getBlend() {
+    ensureInit();
+    if (transitionDuration <= 0 || transitionTimer <= 0) {
+      return 1;
+    }
+    return 1 - transitionTimer / transitionDuration;
+  }
+
+  function blendValues(prev, nxt, t) {
+    return prev + (nxt - prev) * t;
+  }
+
+  function getStatePair() {
+    ensureInit();
+    const current = states[activeIndex];
+    const previous = states[previousIndex] || current;
+    return { current, previous, blend: getBlend() };
+  }
+
+  function safeValue(state, property, fallback) {
+    const value = state[property];
+    return typeof value === "number" ? value : fallback;
+  }
+
+  function mixModifier(property, fallback) {
+    const { current, previous, blend } = getStatePair();
+    const prevValue = safeValue(previous, property, fallback);
+    const nextValue = safeValue(current, property, fallback);
+    return blendValues(prevValue, nextValue, blend);
+  }
+
+  function pickVisualValue(property, fallback) {
+    const { current, previous, blend } = getStatePair();
+    const prevValue = previous[property] || fallback;
+    const nextValue = current[property] || fallback;
+    return { previous: prevValue, current: nextValue, blend };
+  }
+
+  function getGameplayModifiers() {
+    return {
+      pillarSpeedMultiplier: mixModifier('pillarSpeedMultiplier', 1),
+      meteorIntervalMultiplier: mixModifier('meteorIntervalMultiplier', 1),
+      gravityMultiplier: mixModifier('gravityMultiplier', 1)
+    };
+  }
+
+  function getVisualState() {
+    ensureInit();
+    const pair = getStatePair();
+    return {
+      current: pair.current,
+      previous: pair.previous,
+      blend: pair.blend,
+      gradient: pickVisualValue('gradient', pair.current.gradient),
+      overlayColor: pickVisualValue('overlayColor', 'rgba(0, 0, 0, 0)'),
+      starOpacity: mixModifier('starOpacity', 1),
+      fogAlpha: mixModifier('fogAlpha', 0)
+    };
+  }
+
+  function reset() {
+    initialized = false;
+    ensureInit();
+  }
+
+  return { update, getGameplayModifiers, getVisualState, reset };
+})();
+
 const SoundFX = (() => {
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
   const MASTER_GAIN = 0.32;
@@ -361,11 +567,53 @@ const SoundFX = (() => {
     },
     toggle(ctx, destination) {
       simpleTone(ctx, destination, {
-        frequency: 520,
-        endFrequency: 220,
+        frequency: 440,
+        endFrequency: 320,
+        duration: 0.1,
+        gain: 0.12,
+        type: 'square'
+      });
+      simpleTone(ctx, destination, {
+        frequency: 220,
+        endFrequency: 196,
+        duration: 0.14,
+        gain: 0.08,
+        type: 'triangle',
+        delay: 0.02
+      });
+    },
+    powerup(ctx, destination) {
+      simpleTone(ctx, destination, {
+        frequency: 620,
+        endFrequency: 820,
+        duration: 0.24,
+        gain: 0.2,
+        type: 'triangle'
+      });
+      simpleTone(ctx, destination, {
+        frequency: 960,
+        endFrequency: 1080,
         duration: 0.18,
-        gain: 0.16,
+        gain: 0.12,
+        type: 'sine',
+        delay: 0.04
+      });
+    },
+    shield(ctx, destination) {
+      simpleTone(ctx, destination, {
+        frequency: 360,
+        endFrequency: 180,
+        duration: 0.3,
+        gain: 0.22,
         type: 'sine'
+      });
+      simpleTone(ctx, destination, {
+        frequency: 540,
+        endFrequency: 420,
+        duration: 0.2,
+        gain: 0.16,
+        type: 'triangle',
+        delay: 0.02
       });
     }
   };
@@ -378,6 +626,8 @@ const GameState = {
   meteors: [],
   fireballs: [],
   particles: [],
+  powerUpOrbs: [],
+  activePowerUps: [],
   score: 0,
   elapsed: 0,
   timeUntilNextPillar: 0,
@@ -387,8 +637,32 @@ const GameState = {
   pendingFire: false,
   runActive: false,
   difficulty: 0,
-  scrollSpeed: CONFIG.pillar.speedStart
+  scrollSpeed: CONFIG.pillar.speedStart,
+  shards: 0,
+  shieldCharges: 0,
+  effectFlags: {
+    flameSurge: false,
+    windGlyph: false
+  },
+  weatherModifiers: {
+    pillarSpeedMultiplier: 1,
+    meteorIntervalMultiplier: 1,
+    gravityMultiplier: 1
+  },
+  powerUpSnapshot: {
+    scrollMultiplier: 1,
+    gravityMultiplier: 1,
+    fireballRadiusBonus: 0,
+    pierceCount: 0,
+    meteorIntervalMultiplier: 1
+  }
 };
+const POWER_UP_DEFINITIONS = CONFIG.powerUps.definitions.map((entry) => Object.assign({}, entry));
+const POWER_UP_LOOKUP = POWER_UP_DEFINITIONS.reduce((map, definition) => {
+  map[definition.id] = definition;
+  return map;
+}, Object.create(null));
+
 
 const UI_LAYOUT = Object.freeze({
   fireButton: Object.freeze({
@@ -400,7 +674,9 @@ const UI_LAYOUT = Object.freeze({
 
 const UIState = {
   firePointers: new Set(),
-  fireButtonPressed: false
+  fireButtonPressed: false,
+  powerUpFlash: 0,
+  shardFlash: 0
 };
 
 function resetGameState() {
@@ -415,6 +691,8 @@ function resetGameState() {
   GameState.meteors = [];
   GameState.fireballs = [];
   GameState.particles = [];
+  GameState.powerUpOrbs = [];
+  GameState.activePowerUps = [];
   GameState.score = 0;
   GameState.elapsed = 0;
   GameState.fireCooldown = 0;
@@ -425,9 +703,17 @@ function resetGameState() {
   GameState.runActive = true;
   GameState.difficulty = 0;
   GameState.scrollSpeed = CONFIG.pillar.speedStart;
+  GameState.shards = 0;
+  GameState.shieldCharges = 0;
+  GameState.effectFlags.flameSurge = false;
+  GameState.effectFlags.windGlyph = false;
+  GameState.weatherModifiers = WeatherSystem.getGameplayModifiers();
+  ensurePowerUpSnapshot();
 
   UIState.firePointers.clear();
   UIState.fireButtonPressed = false;
+  UIState.powerUpFlash = 0;
+  UIState.shardFlash = 0;
   VisualState.lastScrollSpeed = CONFIG.pillar.speedStart;
 
   spawnPillarPair(true);
@@ -491,7 +777,155 @@ function computeMeteorInterval() {
   const eased = easeInOutCubic(GameState.difficulty);
   const range = CONFIG.meteor.spawnIntervalStart - CONFIG.meteor.spawnIntervalMin;
   const offset = range * (0.3 + 0.7 * eased);
-  return Math.max(0.6, CONFIG.meteor.spawnIntervalStart - offset);
+  const weather = GameState.weatherModifiers || WeatherSystem.getGameplayModifiers();
+  const powerSnapshot = GameState.powerUpSnapshot || ensurePowerUpSnapshot();
+  const baseInterval = Math.max(0.6, CONFIG.meteor.spawnIntervalStart - offset);
+  const weatherFactor = weather.meteorIntervalMultiplier || 1;
+  const powerFactor = powerSnapshot.meteorIntervalMultiplier || 1;
+  return baseInterval * weatherFactor * powerFactor;
+}
+
+function getPowerUpDefinition(id) {
+  return POWER_UP_LOOKUP[id];
+}
+
+function getActivePowerUpSnapshot() {
+  const defFlame = getPowerUpDefinition('flameSurge');
+  const defWind = getPowerUpDefinition('windGlyph');
+  const scrollMultiplier = GameState.effectFlags.windGlyph && defWind && typeof defWind.scrollMultiplier === "number" ? defWind.scrollMultiplier : 1;
+  const gravityMultiplier = GameState.effectFlags.windGlyph && defWind && typeof defWind.gravityMultiplier === "number" ? defWind.gravityMultiplier : 1;
+  const fireballBonus = GameState.effectFlags.flameSurge && defFlame && typeof defFlame.fireballRadiusBonus === "number" ? defFlame.fireballRadiusBonus : 0;
+  const pierceCount = GameState.effectFlags.flameSurge && defFlame && typeof defFlame.pierceCount === "number" ? defFlame.pierceCount : 0;
+  const meteorIntervalMultiplier = GameState.effectFlags.windGlyph && defWind && typeof defWind.meteorIntervalMultiplier === "number" ? defWind.meteorIntervalMultiplier : 1;
+  return {
+    scrollMultiplier,
+    gravityMultiplier,
+    fireballRadiusBonus: fireballBonus,
+    pierceCount,
+    meteorIntervalMultiplier
+  };
+}
+
+function ensurePowerUpSnapshot() {
+  GameState.powerUpSnapshot = getActivePowerUpSnapshot();
+  return GameState.powerUpSnapshot;
+}
+
+function addShards(amount) {
+  if (amount <= 0) {
+    return;
+  }
+  const cap = CONFIG.powerUps.spawnThreshold * 5;
+  GameState.shards = Math.min(cap, GameState.shards + amount);
+  UIState.shardFlash = 0.4;
+  if (GameState.shards >= CONFIG.powerUps.spawnThreshold && GameState.powerUpOrbs.length === 0) {
+    GameState.shards -= CONFIG.powerUps.spawnThreshold;
+    spawnPowerUpOrb();
+  }
+}
+
+function spawnPowerUpOrb() {
+  const definition = POWER_UP_DEFINITIONS[Math.floor(Math.random() * POWER_UP_DEFINITIONS.length)];
+  if (!definition) {
+    return;
+  }
+  const baseY = randomRange(140, CONFIG.groundY - 210);
+  GameState.powerUpOrbs.push({
+    id: definition.id,
+    x: CONFIG.width + 90,
+    yBase: baseY,
+    y: baseY,
+    phase: Math.random() * Math.PI * 2,
+    radius: CONFIG.powerUps.orbRadius,
+    color: colorToRgbaString(definition.color || '#f4c98a', 0.85)
+  });
+}
+
+function updatePowerUpOrbs(dt) {
+  const speedBase = CONFIG.powerUps.orbSpeedOffset;
+  for (let i = GameState.powerUpOrbs.length - 1; i >= 0; i -= 1) {
+    const orb = GameState.powerUpOrbs[i];
+    orb.x -= (GameState.scrollSpeed + speedBase) * dt;
+    orb.phase += dt * 3.1;
+    orb.y = orb.yBase + Math.sin(orb.phase) * 16;
+
+    if (orb.x + orb.radius < -40) {
+      GameState.powerUpOrbs.splice(i, 1);
+      continue;
+    }
+
+    const dragon = GameState.dragon;
+    if (dragon && circlesOverlap(dragon.x, dragon.y, dragon.radius, orb.x, orb.y, orb.radius)) {
+      GameState.powerUpOrbs.splice(i, 1);
+      activatePowerUp(orb.id);
+    }
+  }
+}
+
+function activatePowerUp(id) {
+  const definition = getPowerUpDefinition(id);
+  if (!definition) {
+    return;
+  }
+  UIState.powerUpFlash = 0.5;
+  Particles.spawnPowerUpPickup(GameState.particles, GameState.dragon.x, GameState.dragon.y, definition.color || "#ffffff");
+  SoundFX.play("powerup");
+
+  if (definition.shieldCharges) {
+    GameState.shieldCharges += definition.shieldCharges;
+  }
+
+  if (definition.duration && definition.duration > 0) {
+    const existing = GameState.activePowerUps.find((entry) => entry.id === id);
+    if (existing) {
+      existing.remaining = definition.duration;
+      existing.duration = definition.duration;
+    } else if (GameState.activePowerUps.length < CONFIG.powerUps.maxActive || id === "windGlyph" || id === "flameSurge") {
+      GameState.activePowerUps.push({ id, remaining: definition.duration, duration: definition.duration });
+    }
+  }
+
+  if (id === "flameSurge") {
+    GameState.effectFlags.flameSurge = true;
+  } else if (id === "windGlyph") {
+    GameState.effectFlags.windGlyph = true;
+  }
+}
+
+function updateActivePowerUps(dt) {
+  for (let i = GameState.activePowerUps.length - 1; i >= 0; i -= 1) {
+    const active = GameState.activePowerUps[i];
+    if (active.duration <= 0) {
+      continue;
+    }
+    active.remaining = Math.max(0, active.remaining - dt);
+    if (active.remaining <= 0) {
+      expirePowerUp(active.id);
+      GameState.activePowerUps.splice(i, 1);
+    }
+  }
+}
+
+function expirePowerUp(id) {
+  if (id === "flameSurge") {
+    GameState.effectFlags.flameSurge = false;
+  } else if (id === "windGlyph") {
+    GameState.effectFlags.windGlyph = false;
+  }
+}
+
+function consumeShield(reason) {
+  if (GameState.shieldCharges <= 0) {
+    return false;
+  }
+  GameState.shieldCharges = Math.max(0, GameState.shieldCharges - 1);
+  UIState.powerUpFlash = 0.45;
+  SoundFX.play("shield");
+  if (GameState.dragon) {
+    Particles.spawnShieldBurst(GameState.particles, GameState.dragon.x, GameState.dragon.y, reason);
+    GameState.dragon.vy = Math.min(GameState.dragon.vy, CONFIG.dragon.flapImpulseVy * 0.5);
+  }
+  return true;
 }
 
 function requestFlap() {
@@ -518,12 +952,16 @@ function attemptFire() {
     return;
   }
   const dragon = GameState.dragon;
+  const powerSnapshot = GameState.powerUpSnapshot || ensurePowerUpSnapshot();
+  const radiusBonus = powerSnapshot.fireballRadiusBonus || 0;
+  const pierceCount = powerSnapshot.pierceCount || 0;
   GameState.fireballs.push({
     x: dragon.x + dragon.radius + 6,
     y: dragon.y - 4,
     vx: CONFIG.fireball.speed,
-    radius: CONFIG.fireball.radius,
-    lifetime: CONFIG.fireball.lifetime
+    radius: CONFIG.fireball.radius + radiusBonus,
+    lifetime: CONFIG.fireball.lifetime,
+    pierce: pierceCount
   });
   GameState.fireCooldown = CONFIG.fireball.cooldown;
   SoundFX.play('fire');
@@ -536,6 +974,8 @@ function updatePlayState(dt) {
 
   GameState.elapsed += dt;
   GameState.fireCooldown = Math.max(0, GameState.fireCooldown - dt);
+  UIState.powerUpFlash = Math.max(0, UIState.powerUpFlash - dt);
+  UIState.shardFlash = Math.max(0, UIState.shardFlash - dt);
 
   if (GameState.pendingFlap) {
     applyFlap();
@@ -552,8 +992,11 @@ function updatePlayState(dt) {
   }
 
   GameState.difficulty = computeDifficulty();
-  GameState.scrollSpeed = currentScrollSpeed();
-  VisualState.lastScrollSpeed = GameState.scrollSpeed;
+  GameState.weatherModifiers = WeatherSystem.getGameplayModifiers();
+  const powerSnapshot = ensurePowerUpSnapshot();
+  const combinedScroll = currentScrollSpeed() * GameState.weatherModifiers.pillarSpeedMultiplier * powerSnapshot.scrollMultiplier;
+  GameState.scrollSpeed = combinedScroll;
+  VisualState.lastScrollSpeed = combinedScroll;
 
   if (updateDragon(dt)) {
     return;
@@ -568,21 +1011,36 @@ function updatePlayState(dt) {
   }
 
   updateFireballs(dt);
+  updatePowerUpOrbs(dt);
+  updateActivePowerUps(dt);
+  ensurePowerUpSnapshot();
   Particles.update(GameState.particles, dt);
 }
 function updateDragon(dt) {
   const dragon = GameState.dragon;
-  dragon.vy += CONFIG.gravity * dt;
+  const weather = GameState.weatherModifiers || WeatherSystem.getGameplayModifiers();
+  const powerSnapshot = GameState.powerUpSnapshot || ensurePowerUpSnapshot();
+  const gravityScale = (weather.gravityMultiplier || 1) * (powerSnapshot.gravityMultiplier || 1);
+  dragon.vy += CONFIG.gravity * gravityScale * dt;
   dragon.vy = Math.min(dragon.vy, CONFIG.dragon.maxFallSpeed);
   dragon.y += dragon.vy * dt;
   dragon.rotation = clamp(dragon.vy / 640, -0.75, 0.85);
 
   if (dragon.y - dragon.radius <= 0) {
+    if (consumeShield('ceiling')) {
+      dragon.y = dragon.radius + 4;
+      return false;
+    }
     finishRun('ceiling');
     return true;
   }
 
   if (dragon.y + dragon.radius >= CONFIG.groundY) {
+    if (consumeShield('ground')) {
+      dragon.y = CONFIG.groundY - dragon.radius - 2;
+      dragon.vy = CONFIG.dragon.flapImpulseVy * 0.55;
+      return false;
+    }
     finishRun('ground');
     return true;
   }
@@ -618,6 +1076,9 @@ function updatePillars(dt) {
     };
 
     if (circleVsRect(dragon, topRect, fairnessInset) || circleVsRect(dragon, bottomRect, fairnessInset)) {
+      if (consumeShield('pillar')) {
+        continue;
+      }
       finishRun('pillar');
       return true;
     }
@@ -660,6 +1121,10 @@ function updateMeteors(dt) {
     }
 
     if (circlesOverlap(dragon.x, dragon.y, dragon.radius, meteor.x, meteor.y, meteor.radius)) {
+      if (consumeShield('meteor')) {
+        GameState.meteors.splice(i, 1);
+        continue;
+      }
       finishRun('meteor');
       return true;
     }
@@ -679,27 +1144,36 @@ function updateFireballs(dt) {
       continue;
     }
 
-    let hitMeteor = false;
+    let consumed = false;
     for (let j = GameState.meteors.length - 1; j >= 0; j -= 1) {
       const meteor = GameState.meteors[j];
-      if (circlesOverlap(fireball.x, fireball.y, fireball.radius, meteor.x, meteor.y, meteor.radius)) {
-        GameState.meteors.splice(j, 1);
-        GameState.fireballs.splice(i, 1);
-        GameState.score += 1;
-        Particles.spawnMeteorImpact(GameState.particles, meteor.x, meteor.y);
-        Particles.spawnScorePop(GameState.particles, {
-          amount: 1,
-          x: CONFIG.width / 2,
-          y: 48
-        });
-        SoundFX.play('hit');
-        hitMeteor = true;
-        break;
+      if (!circlesOverlap(fireball.x, fireball.y, fireball.radius, meteor.x, meteor.y, meteor.radius)) {
+        continue;
       }
+
+      GameState.meteors.splice(j, 1);
+      GameState.score += 1;
+      Particles.spawnMeteorImpact(GameState.particles, meteor.x, meteor.y);
+      Particles.spawnScorePop(GameState.particles, {
+        amount: 1,
+        x: CONFIG.width / 2,
+        y: 48
+      });
+      SoundFX.play('hit');
+      addShards(CONFIG.powerUps.shardPerMeteor);
+
+      if (fireball.pierce && fireball.pierce > 0) {
+        fireball.pierce -= 1;
+        fireball.lifetime = Math.max(fireball.lifetime, 0.2);
+      } else {
+        consumed = true;
+      }
+
+      break;
     }
 
-    if (hitMeteor) {
-      continue;
+    if (consumed) {
+      GameState.fireballs.splice(i, 1);
     }
   }
 }
@@ -734,6 +1208,11 @@ function createRunSnapshot(reason) {
     pillars: GameState.pillars.map((pillar) => ({ ...pillar })),
     meteors: GameState.meteors.map((meteor) => ({ ...meteor })),
     fireballs: GameState.fireballs.map((fireball) => ({ ...fireball })),
+    powerUpOrbs: GameState.powerUpOrbs.map((orb) => ({ ...orb })),
+    activePowerUps: GameState.activePowerUps.map((power) => ({ ...power })),
+    effectFlags: { ...GameState.effectFlags },
+    shards: GameState.shards,
+    shieldCharges: GameState.shieldCharges,
     particles: Particles.clone(GameState.particles),
     reason
   };
@@ -756,6 +1235,36 @@ function wrapValue(value, min, max) {
     result += range;
   }
   return result + min;
+}
+
+function colorToRgbaString(color, alpha = 1) {
+  if (typeof color !== "string") {
+    return `rgba(255, 235, 184, ${alpha})`;
+  }
+  if (color.startsWith("rgba(")) {
+    if (alpha === 1) {
+      return color;
+    }
+    const channels = color.slice(5, -1).split(",").map((part) => part.trim());
+    return `rgba(${channels[0]}, ${channels[1]}, ${channels[2]}, ${alpha})`;
+  }
+  if (color.startsWith("rgb(")) {
+    const channels = color.slice(4, -1);
+    return `rgba(${channels}, ${alpha})`;
+  }
+  if (color.startsWith("#") && (color.length === 7 || color.length === 4)) {
+    const hex = color.length === 4
+      ? color.slice(1).split("").map((ch) => ch + ch).join("")
+      : color.slice(1);
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+    if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) {
+      return `rgba(255, 235, 184, ${alpha})`;
+    }
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+  return `rgba(255, 235, 184, ${alpha})`;
 }
 
 function easeInOutCubic(t) {
@@ -807,6 +1316,31 @@ function toggleMute() {
 }
 
 const Particles = (() => {
+  function parseColorToRgb(value) {
+    if (typeof value !== "string") {
+      return null;
+    }
+    if (value.startsWith("rgba(")) {
+      return value.slice(5, -1);
+    }
+    if (value.startsWith("rgb(")) {
+      return value.slice(4, -1);
+    }
+    if (value.startsWith("#") && (value.length === 7 || value.length === 4)) {
+      const hex = value.length === 4
+        ? value.slice(1).split("").map((ch) => ch + ch).join("")
+        : value.slice(1);
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) {
+        return null;
+      }
+      return `${r}, ${g}, ${b}`;
+    }
+    return null;
+  }
+
   function push(list, particle) {
     if (list.length >= CONFIG.particles.cap) {
       list.splice(0, list.length - CONFIG.particles.cap + 1);
@@ -873,6 +1407,46 @@ const Particles = (() => {
     }
   }
 
+  function spawnPowerUpPickup(list, x, y, color) {
+    const rgb = parseColorToRgb(color) || '255, 235, 184';
+    for (let i = 0; i < 18; i += 1) {
+      const angle = randomRange(0, Math.PI * 2);
+      const speed = randomRange(120, 240);
+      push(list, {
+        type: 'spark',
+        layer: 'world',
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: randomRange(0.35, 0.6),
+        ttl: randomRange(0.35, 0.6),
+        size: randomRange(2.2, 4.2),
+        color: rgb
+      });
+    }
+  }
+
+  function spawnShieldBurst(list, x, y, reason) {
+    const qty = 24;
+    for (let i = 0; i < qty; i += 1) {
+      const angle = (Math.PI * 2 * i) / qty;
+      const speed = randomRange(160, 260);
+      push(list, {
+        type: 'spark',
+        layer: 'world',
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: randomRange(0.3, 0.5),
+        ttl: randomRange(0.3, 0.5),
+        size: randomRange(2.6, 4.4),
+        color: '150, 220, 255'
+      });
+    }
+  }
+
   function update(list, dt) {
     for (let i = list.length - 1; i >= 0; i -= 1) {
       const particle = list[i];
@@ -921,7 +1495,7 @@ const Particles = (() => {
     return list.map((particle) => ({ ...particle }));
   }
 
-  return { spawnScorePop, spawnMeteorImpact, spawnCrashBurst, update, draw, clone };
+  return { spawnScorePop, spawnMeteorImpact, spawnCrashBurst, spawnPowerUpPickup, spawnShieldBurst, update, draw, clone };
 })();
 const Scenes = {};
 
@@ -1239,6 +1813,7 @@ function renderWorld(ctx, state, options = {}) {
   drawBackdrop(ctx, overlayAlpha, elapsed, VisualState.lastScrollSpeed);
   drawPillars(ctx, state?.pillars ?? []);
   drawMeteors(ctx, state?.meteors ?? []);
+  drawPowerUpOrbs(ctx, state?.powerUpOrbs ?? GameState.powerUpOrbs);
   drawFireballs(ctx, state?.fireballs ?? []);
   Particles.draw(ctx, state?.particles ?? [], 'world');
   if (state?.dragon) {
@@ -1267,19 +1842,36 @@ function formatReason(reason) {
 
 function drawBackdrop(ctx, overlayAlpha = 0, timeSeconds = VisualState.globalTime, scrollHint = VisualState.lastScrollSpeed) {
   ctx.save();
+  const weatherVisual = WeatherSystem.getVisualState();
+  const gradientConfig = (weatherVisual.gradient && weatherVisual.gradient.current) || weatherVisual.current.gradient || {
+    top: '#0e1a36',
+    mid: '#1a2f55',
+    bottom: '#2a1a33'
+  };
   const gradient = ctx.createLinearGradient(0, 0, 0, CONFIG.height);
-  gradient.addColorStop(0, '#0e1a36');
-  gradient.addColorStop(0.42, '#1a2f55');
-  gradient.addColorStop(1, '#2a1a33');
+  gradient.addColorStop(0, gradientConfig.top);
+  gradient.addColorStop(0.42, gradientConfig.mid);
+  gradient.addColorStop(1, gradientConfig.bottom);
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, CONFIG.width, CONFIG.height);
 
   drawNebula(ctx, timeSeconds);
-  drawStarfield(ctx, timeSeconds, scrollHint);
+  drawStarfield(ctx, timeSeconds, scrollHint, weatherVisual.starOpacity || 1);
   drawRidge(ctx, timeSeconds, scrollHint, 0.18, CONFIG.groundY - 220, '#1c2745');
   drawRidge(ctx, timeSeconds, scrollHint, 0.32, CONFIG.groundY - 120, '#222c53');
   drawRidge(ctx, timeSeconds, scrollHint, 0.52, CONFIG.groundY - 60, '#2a3564');
   drawGround(ctx, timeSeconds, scrollHint);
+
+  const overlayColor = weatherVisual.overlayColor && weatherVisual.overlayColor.current;
+  if (overlayColor && overlayColor !== 'rgba(0, 0, 0, 0)') {
+    ctx.fillStyle = overlayColor;
+    ctx.fillRect(0, 0, CONFIG.width, CONFIG.height);
+  }
+
+  if (weatherVisual.fogAlpha && weatherVisual.fogAlpha > 0) {
+    ctx.fillStyle = `rgba(220, 232, 255, ${weatherVisual.fogAlpha})`;
+    ctx.fillRect(0, 0, CONFIG.width, CONFIG.height);
+  }
 
   if (overlayAlpha > 0) {
     ctx.fillStyle = `rgba(3, 6, 12, ${overlayAlpha})`;
@@ -1301,12 +1893,12 @@ function drawNebula(ctx, timeSeconds) {
   ctx.restore();
 }
 
-function drawStarfield(ctx, timeSeconds, scrollHint) {
+function drawStarfield(ctx, timeSeconds, scrollHint, opacityMultiplier = 1) {
   const scroll = (scrollHint * 0.45 + 26) * timeSeconds;
   for (const star of VisualState.stars) {
     const offsetX = wrapValue(star.baseX - scroll * star.depth, -120, CONFIG.width + 120);
     const twinkle = Math.sin(timeSeconds * (1.4 + star.depth) + star.twinkle) * 0.35 + 0.65;
-    const alpha = 0.22 + 0.6 * twinkle;
+    const alpha = Math.max(0, Math.min(1.2, (0.22 + 0.6 * twinkle) * opacityMultiplier));
     ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
     ctx.fillRect(offsetX, star.baseY + Math.sin(timeSeconds * 0.6 + star.twinkle) * 4 * (1 - star.depth), star.size, star.size);
   }
@@ -1473,11 +2065,79 @@ function drawFireballs(ctx, fireballs) {
   ctx.restore();
 }
 
-function drawHUD(ctx, state) {
+function drawPowerUpOrbs(ctx, orbs) {
+  ctx.save();
+  for (const orb of orbs) {
+    const baseColor = colorToRgbaString(orb.color, 1);
+    const gradient = ctx.createRadialGradient(orb.x, orb.y, 4, orb.x, orb.y, orb.radius);
+    gradient.addColorStop(0, colorToRgbaString(orb.color, 0.9));
+    gradient.addColorStop(0.7, baseColor);
+    gradient.addColorStop(1, 'rgba(24, 26, 42, 0.85)');
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(orb.x, orb.y, orb.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = colorToRgbaString(orb.color, 0.35);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawActivePowerUps(ctx, state = GameState) {
+  const boxX = CONFIG.width - 168;
+  const boxY = 150;
   ctx.save();
   ctx.fillStyle = 'rgba(9, 14, 27, 0.55)';
+  ctx.fillRect(boxX, boxY, 150, 64);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = "600 16px 'Segoe UI', Tahoma, sans-serif";
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  const shardCount = state?.shards ?? GameState.shards;
+  ctx.fillText(`Shards ${shardCount}`, boxX + 10, boxY + 20);
+
+  let buffLabel = 'No Active Buff';
+  let buffColor = '#b8c0dc';
+  const activeList = state?.activePowerUps ?? GameState.activePowerUps;
+  const flame = activeList?.find((entry) => entry.id === 'flameSurge');
+  const wind = activeList?.find((entry) => entry.id === 'windGlyph');
+  const flameActive = state?.effectFlags?.flameSurge ?? GameState.effectFlags.flameSurge;
+  const windActive = state?.effectFlags?.windGlyph ?? GameState.effectFlags.windGlyph;
+  if (flameActive && flame) {
+    buffColor = '#f97b5f';
+    buffLabel = `Flame Surge ${flame.remaining.toFixed(1)}s`;
+  } else if (windActive && wind) {
+    buffColor = '#8ae6d6';
+    buffLabel = `Wind Glyph ${wind.remaining.toFixed(1)}s`;
+  } else if (flameActive) {
+    buffColor = '#f97b5f';
+    buffLabel = 'Flame Surge';
+  } else if (windActive) {
+    buffColor = '#8ae6d6';
+    buffLabel = 'Wind Glyph';
+  }
+  ctx.fillStyle = buffColor;
+  ctx.fillText(buffLabel, boxX + 10, boxY + 40);
+
+  const shields = state?.shieldCharges ?? GameState.shieldCharges;
+  if (shields > 0) {
+    ctx.fillStyle = '#9ad7ff';
+    ctx.fillText(`Shield x${shields}`, boxX + 10, boxY + 58);
+  }
+
+  ctx.restore();
+}
+
+
+function drawHUD(ctx, state) {
+  ctx.save();
+  const shardGlow = clamp(UIState.shardFlash, 0, 1);
+  const powerGlow = clamp(UIState.powerUpFlash, 0, 1);
+  ctx.fillStyle = `rgba(9, 14, 27, ${0.55 + shardGlow * 0.25})`;
   ctx.fillRect(18, 20, 150, 60);
+  ctx.fillStyle = `rgba(9, 14, 27, ${0.55 + powerGlow * 0.25})`;
   ctx.fillRect(CONFIG.width - 168, 20, 150, 60);
+  ctx.fillStyle = 'rgba(9, 14, 27, 0.55)';
   ctx.fillRect(18, 90, 150, 46);
 
   ctx.fillStyle = '#ffffff';
@@ -1497,6 +2157,7 @@ function drawHUD(ctx, state) {
   ctx.fillText(`Time ${state.elapsed?.toFixed(1) ?? '0.0'}s`, CONFIG.width - 28, 110);
   ctx.restore();
 
+  drawActivePowerUps(ctx, state);
   drawFireButton(ctx, UI_LAYOUT.fireButton, UIState.fireButtonPressed, state.fireCooldown <= 0);
 }
 
@@ -1662,6 +2323,7 @@ function gameLoop(now) {
   lastFrame = now;
 
   VisualState.globalTime = wrapValue(VisualState.globalTime + deltaSeconds, 0, 1000);
+  WeatherSystem.update(deltaSeconds);
   SceneManager.update(deltaSeconds);
   SceneManager.draw(context);
 

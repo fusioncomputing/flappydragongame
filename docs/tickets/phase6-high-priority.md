@@ -1,11 +1,12 @@
 # Phase 6 Candidate Tickets
 
-_Last updated: 2025-09-28_
+_Last updated: 2025-09-29_
 
 These tickets expand the two high-priority gameplay initiatives from the backlog into concrete, actionable work items. Each ticket outlines goals, player impact, scoped engineering tasks, and acceptance criteria to accelerate grooming once v1.0.0 is signed off. See `docs/tickets/phase6-task-breakdown.md` for granular issue sizing and cross-team follow-ups.
 
 ## Ticket: Realm Gates Campaign Flow
-- **Backlog Reference:** `docs/feature-backlog.md` → Realm Gates campaign flow (High)
+- **Backlog Reference:** `docs/feature-backlog.md` -> Realm Gates campaign flow (High)
+- **Status:** Pending (not started)
 - **Goal:** Provide a curated progression path that introduces handcrafted challenge mixes before players enter endless mode, increasing retention for early and mid-skill cohorts.
 - **Success Metrics:**
   - +20% increase in Day-3 retention for new players (target to validate post-launch analytics).
@@ -33,7 +34,8 @@ These tickets expand the two high-priority gameplay initiatives from the backlog
   - Should relics stack indefinitely, or cap at two active bonuses? Needs balancing discussion.
 
 ## Ticket: Elemental Power-Ups & Resource Loop
-- **Backlog Reference:** `docs/feature-backlog.md` → Elemental power-ups & resource loop (High)
+- **Backlog Reference:** `docs/feature-backlog.md` -> Elemental power-ups & resource loop (High)
+- **Status:** Implemented on main (dynamic power-ups & shard economy)
 - **Goal:** Introduce temporary power-ups that reward high-skill meteor play and create mid-run decision making without overwhelming new players.
 - **Success Metrics:**
   - Meteor kill rate increases by 15% once power-ups ship (indicating offensive engagement).
@@ -53,6 +55,7 @@ These tickets expand the two high-priority gameplay initiatives from the backlog
   4. **Balance & Accessibility**
      - Provide settings toggle to disable power-ups for purists (still records in stats for fairness).
      - Ensure power-ups respect assist mode if introduced later.
+- **Follow-ups:** Balance shard thresholds, buff durations, and audio mix in post-launch playtests; scope additional elemental variants for Phase 6 expansion.
 - **Acceptance Criteria:**
   - Players earn and spend shards, triggering each power-up with clear visual/audio feedback.
   - Buff timers and effects expire cleanly without lingering state.
@@ -64,6 +67,7 @@ These tickets expand the two high-priority gameplay initiatives from the backlog
 
 ## Ticket: Relic Crafting & Loadouts
 - **Backlog Reference:** `docs/feature-backlog.md#relic-crafting--loadouts-high`
+- **Status:** Pending (planning)
 - **Goal:** Deliver a pre-run customization layer where players craft and equip relic sets that meaningfully tweak core stats without breaking game balance.
 - **Success Metrics:**
   - At least 65% of players who unlock the system equip a relic before their next run.
@@ -93,3 +97,8 @@ These tickets expand the two high-priority gameplay initiatives from the backlog
 ## Suggested Follow-up Tasks
 - Break each ticket into granular engineering tasks (data model, UI, FX, QA) during sprint planning.
 - Tag related issues in the tracker once created, referencing this document for context.
+
+
+
+
+
