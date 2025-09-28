@@ -9,12 +9,15 @@ This backlog captures high-level gameplay ideas that build on the current Phase 
 | --- | --- | --- |
 | Realm Gates campaign flow | High | Adds structured progression with handcrafted encounter mixes |
 | Elemental power-ups & resource loop | High | Introduces moment-to-moment decision making and mid-run variety |
+| Relic crafting & loadouts | High | Unlocks pre-run strategy with customizable relic combinations |
 | Elite hazards & boss encounters | Medium | Creates new spike moments once baseline mastery is reached |
 | Daily trials & rotating mutators | Medium | Encourages daily engagement and leaderboard churn |
 | Achievements & cosmetic skins | Medium | Rewards mastery, supports long-term retention |
 | Accessibility assists & comfort options | Medium | Broadens audience and improves approachability |
+| Dynamic weather & biomes | Medium | Adds visual variety and momentary rule twists mid-run |
 | Async leaderboards & share codes | Low | Enables social proof without real-time backend |
 | Ghost replays & training mode | Low | Gives players tools to self-improve and share runs |
+| Seasonal festival events | Low | Provides limited-time goals and cosmetics tied to calendar beats |
 
 ## Detailed Notes
 ### Realm Gates Campaign Flow (High)
@@ -30,6 +33,12 @@ This backlog captures high-level gameplay ideas that build on the current Phase 
 - **Design Notes:** Gate power-up spawns behind a resource like “ember shards” collected from meteors, encouraging offensive play.
 - **Implementation Sketch:** Extend `GameState` with collectible counters, add power-up entities with timers, and surface UI badges in HUD.
 - **Dependencies:** Particle/audio variations, new iconography, balance pass alongside difficulty ramps.
+### Relic Crafting & Loadouts (High)
+- **Player Impact:** Allow players to earn, craft, and equip relic sets that tweak core stats before a run, creating meaningful pre-flight decisions.
+- **Design Notes:** Combine relic shards from campaign gates or achievements; enforce slot types (offense/defense/utility) to keep balance.
+- **Implementation Sketch:** Add relic inventory to persistence, pre-run loadout UI, and modifiers that hook into CONFIG before each run begins.
+- **Dependencies:** Requires new UI flow, additional art for relic icons, and analytics to track equip rates.
+
 
 ### Elite Hazards & Boss Encounters (Medium)
 - **Player Impact:** Introduce occasional elite threats (armored meteors requiring multiple hits, moving pillars, mini-boss gargoyles). Keeps expert runs tense.
@@ -55,6 +64,12 @@ This backlog captures high-level gameplay ideas that build on the current Phase 
 - **Implementation Sketch:** Extend settings menu with new toggles, adjust game loop parameters when assists active, update HUD to indicate assist usage.
 - **Dependencies:** Additional settings persistence and conditional logic in scoring/leaderboards.
 
+### Dynamic Weather & Biomes (Medium)
+- **Player Impact:** Introduce shifting weather fronts (storms, auroras, sandstorms) and biome swaps that subtly change visibility, hazard mix, and soundtrack mid-run.
+- **Design Notes:** Weather cycles tie to elapsed time; biomes provide unique pillar/meteor skins without needing full asset overhauls.
+- **Implementation Sketch:** Add weather controller influencing backdrop colors, spawn tables, and audio layers; ensure transitions telegraph clearly.
+- **Dependencies:** Additional art/audio variants, performance validation on low-end devices.
+
 ### Async Leaderboards & Share Codes (Low)
 - **Player Impact:** Allow players to share best runs via generated codes or simple REST endpoints without requiring real-time multiplayer.
 - **Design Notes:** Start with offline share codes (hash of score + modifiers) and optionally upgrade to lightweight server storage.
@@ -66,6 +81,12 @@ This backlog captures high-level gameplay ideas that build on the current Phase 
 - **Design Notes:** Pair with a “training ground” scene that removes scoring but provides controlled setups for practicing hazards.
 - **Implementation Sketch:** Record player inputs per frame (bounded buffer), replay via deterministic simulation; reuse current scene manager.
 - **Dependencies:** Deterministic physics verification, serialization format, additional UI to select ghosts.
+
+### Seasonal Festival Events (Low)
+- **Player Impact:** Roll out limited-time festival arcs (e.g., Lunar New Year, Solstice) with themed hazards, cosmetics, and mini-goals to re-engage lapsed players.
+- **Design Notes:** Each festival ships with a bespoke mutator and community goal; cosmetics persist after event ends.
+- **Implementation Sketch:** Build event scheduler tied to calendar, load themed assets/CONFIG, and surface countdown + rewards in menu.
+- **Dependencies:** Requires content pipeline for event assets, legal review for calendar-based rewards, and analytics tracking participation.
 
 ## Next Steps
 1. Prioritise High items for the post-1.0 roadmap and break them into engineering tasks.
