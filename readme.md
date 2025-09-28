@@ -5,6 +5,7 @@ A portrait-oriented HTML5 canvas game inspired by Flappy Bird. Guide a tenacious
 ## Table of Contents
 - [Project Status](#project-status)
 - [Features](#features)
+- [Showcase](#showcase)
 - [Tech Stack](#tech-stack)
 - [Repository Layout](#repository-layout)
 - [Getting Started](#getting-started)
@@ -13,6 +14,8 @@ A portrait-oriented HTML5 canvas game inspired by Flappy Bird. Guide a tenacious
 - [Core Systems Specification](#core-systems-specification)
 - [Work Plan](#work-plan)
 - [Testing Checklist](#testing-checklist)
+- [Release Checklist](#release-checklist)
+- [Changelog](#changelog)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -32,6 +35,16 @@ A portrait-oriented HTML5 canvas game inspired by Flappy Bird. Guide a tenacious
 - Lightweight Web Audio soundboard with mute persistence and first-input unlock.
 - Particle bursts for crashes, meteor hits, and score pops tied to HUD feedback.
 
+## Showcase
+
+| Menu snapshot | Mid-run action | Game over |
+| --- | --- | --- |
+| ![Menu snapshot](docs/media/menu-overview.svg) | ![Mid-run action](docs/media/play-session.svg) | ![Game over panel](docs/media/game-over.svg) |
+
+![Gameplay loop placeholder](docs/media/gameplay-loop-placeholder.gif)
+
+> These visuals are stylised mocks stored in `docs/media/`. Replace them with real captures before shipping v1.0.0.
+
 ## Tech Stack
 
 - HTML5 canvas + vanilla JavaScript (ES module style IIFE).
@@ -42,11 +55,13 @@ A portrait-oriented HTML5 canvas game inspired by Flappy Bird. Guide a tenacious
 ```
 .
 |-- docs/
+|   |-- media/                # Release collateral (screenshots, GIFs)
 |   `-- development-plan.md   # Detailed multi-phase delivery roadmap
 |-- index.html                # Minimal shell that mounts the game canvas
 |-- styles.css                # Layout and presentation styling
 |-- game.js                   # Main game loop, scene manager, input plumbing
 |-- agents.md                 # Team roles and responsibilities
+|-- CHANGELOG.md              # Version history and release notes
 `-- readme.md                 # Project overview, setup, and roadmap summary
 ```
 
@@ -121,6 +136,16 @@ Manual QA should cover:
 - Canvas resizes without distortion; letterboxing stays stable.
 - Pause/resume flow preserves state without resetting.
 - Mute and best score persist via `localStorage`.
+
+## Release Checklist
+- Capture fresh menu, mid-run, and game-over screenshots and update `docs/media/`.
+- Record a short gameplay GIF (5-8 seconds) covering flap, meteor hit, and scoring, then replace the placeholder asset.
+- Run through the Testing Checklist on desktop and mobile portrait viewports.
+- Update `CHANGELOG.md` and tag `v1.0.0` once QA passes.
+
+## Changelog
+
+See `CHANGELOG.md` for a human-curated release history. The 1.0.0 entry captures the Phase 4 polish milestone.
 
 ## Contributing
 

@@ -43,6 +43,7 @@ _Last updated: 2025-09-28_
 
 ## Phase 5 - QA and Release (Pending)
 - Manual regression checklist aligned with README test section (flap responsiveness, fairness, spawn cadence, persistence).
+- Capture real menu, mid-run, and game-over media, replace the `docs/media/` placeholders, and refresh the README gallery.
 - Performance profiling under mobile throttling, event loop sanity checks.
 - Final documentation update (controls guide, build/run instructions), tag `v1.0.0` candidate.
 

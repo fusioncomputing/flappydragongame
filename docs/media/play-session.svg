@@ -1,0 +1,46 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='480' height='800' viewBox='0 0 480 800'>
+  <defs>
+    <linearGradient id='bg' x1='0' y1='0' x2='0' y2='1'>
+      <stop offset='0%' stop-color='#0e1a36'/>
+      <stop offset='45%' stop-color='#1a2f55'/>
+      <stop offset='100%' stop-color='#2a1a33'/>
+    </linearGradient>
+    <style>
+      .title { font: 700 42px "Segoe UI", Tahoma, sans-serif; fill: #f7f3ff; }
+      .subtitle { font: 600 20px "Segoe UI", Tahoma, sans-serif; fill: #cbd5ff; }
+      .label { font: 600 16px "Segoe UI", Tahoma, sans-serif; fill: #f8f8ff; }
+      .note { font: 500 15px "Segoe UI", Tahoma, sans-serif; fill: #aeb8e6; }
+    </style>
+  </defs>
+  <rect width='480' height='800' fill='url(#bg)'/>
+  
+  <text x='240' y='120' class='title' text-anchor='middle'>Mid-run Action</text>
+  <text x='240' y='170' class='subtitle' text-anchor='middle'>Pillars + Meteors + HUD</text>
+  <g>
+    <rect x='70' y='0' width='80' height='250' fill='rgba(36,55,91,0.85)'/>
+    <rect x='70' y='430' width='80' height='290' fill='rgba(36,55,91,0.85)'/>
+    <rect x='330' y='0' width='80' height='300' fill='rgba(36,55,91,0.85)'/>
+    <rect x='330' y='480' width='80' height='260' fill='rgba(36,55,91,0.85)'/>
+  </g>
+  <circle cx='190' cy='360' r='28' fill='url(#dragonGrad)'/>
+  <defs>
+    <radialGradient id='meteorGrad' cx='0.4' cy='0.4' r='0.8'>
+      <stop offset='0%' stop-color='#ffd166'/>
+      <stop offset='50%' stop-color='#f3722c'/>
+      <stop offset='100%' stop-color='#d64045'/>
+    </radialGradient>
+    <linearGradient id='dragonGrad' x1='0' y1='0' x2='1' y2='1'>
+      <stop offset='0%' stop-color='#f94144'/>
+      <stop offset='50%' stop-color='#f3722c'/>
+      <stop offset='100%' stop-color='#f8961e'/>
+    </linearGradient>
+  </defs>
+  <circle cx='360' cy='260' r='18' fill='url(#meteorGrad)'/>
+  <rect x='40' y='40' width='160' height='70' rx='12' fill='rgba(9,14,27,0.55)' stroke='rgba(255,255,255,0.1)'/>
+  <text x='120' y='80' class='label' text-anchor='middle'>Score: 5</text>
+  <rect x='280' y='40' width='160' height='70' rx='12' fill='rgba(9,14,27,0.55)' stroke='rgba(255,255,255,0.1)'/>
+  <text x='360' y='80' class='label' text-anchor='middle'>Fire Ready</text>
+  <circle cx='400' cy='680' r='55' fill='rgba(246,198,103,0.9)' stroke='rgba(255,255,255,0.6)' stroke-width='6'/>
+  <text x='400' y='685' class='label' text-anchor='middle'>FIRE</text>
+
+</svg>
