@@ -106,7 +106,7 @@ A portrait-oriented HTML5 canvas game inspired by Flappy Bird. Guide a tenacious
 ## Core Systems Specification
 Key numbers that shape the moment-to-moment feel:
 - Dragon: x = 120, radius 22, gravity 1800, flap impulse vy = -520, max fall speed 900.
-- Pillars: width 90, scroll speed eases from 184 to 252 as difficulty rises, gaps contract from 218px toward a 140px floor, spacing starts at 260-340px and tightens late run.
+- Pillars: width 90, scroll speed eases from 184 to 252 as difficulty rises, gaps contract from 218px toward a 140px floor, spacing starts at 260-340px (tightens late run) but never spawns faster than ~0.95s apart even at peak speed.
 - Meteors: radius 14, base speed 240-360 with subtle drift, spawn cadence eases from 2.4s down to 0.85s.
 - Fireballs: speed 540, cooldown 0.28s, lifetime 2.0s, radius 10 (Flame Surge increases radius & pierce).
 - Power-ups: ember shards drop from meteors (1 each), orb spawns every 6 shards, effects include Flame Surge (piercing fireballs), Aegis Shield (one-hit protection), and Wind Glyph (reduced gravity/scroll speed).
@@ -151,6 +151,7 @@ Manual QA should cover:
 - On-screen FIRE button responds to taps/holds and respects cooldown.
 - Score increments once per pillar pair; meteor bonus applies on confirmed hits.
 - Difficulty ramps with tighter gaps and faster spawns later in runs.
+- Consecutive pillar pairs respect the 0.95s minimum separation even under weather or power-up speed boosts.
 - Audio cues unlock on first input and respect mute toggles across scenes.
 - Particle bursts appear for meteor hits, crashes, and score pops without stalling the frame rate.
 - Parallax backdrop and ground scroll smoothly on long sessions and window resizes.
@@ -180,9 +181,4 @@ Trunk-based workflow on `main`. Push small, reviewed increments with descriptive
 
 ## License
 TBD.
-
-
-
-
-
 

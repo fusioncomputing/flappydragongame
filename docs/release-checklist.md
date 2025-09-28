@@ -11,6 +11,7 @@ _Last updated: 2025-09-29_
   - Follow-up: Capture a real sequence, export an optimized GIF, and overwrite the placeholder.
 - [ ] Verify ember shard drops, orb spawns, and all elemental power-up effects (Flame Surge/Wind Glyph/Aegis Shield).
 - [ ] Confirm audio cues for mute toggles, power-up pickups, and shield pops respect the mute flag.
+- [ ] Spot-check late-run pillar spacing to ensure the 0.95s minimum interval prevents impossible back-to-back walls.
 - [ ] Stress-test dynamic weather transitions (visual blend + gameplay modifiers).
 - [ ] Run through the Testing Checklist on desktop and mobile portrait viewports.
   - Current state: Manual QA not yet executed for the release candidate. Use the table below to log runs.
@@ -25,5 +26,6 @@ _Last updated: 2025-09-29_
 Once the checklist items above are complete:
 1. `git tag -a v1.0.0 -m "v1.0.0"`
 2. `git push origin v1.0.0`
+
 
 

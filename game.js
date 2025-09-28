@@ -21,7 +21,8 @@ const CONFIG = Object.freeze({
     gapStart: 218,
     gapMin: 140,
     spacingMinX: 260,
-    spacingMaxX: 340
+    spacingMaxX: 340,
+    minInterval: 0.95
   }),
   meteor: Object.freeze({
     radius: 14,
@@ -752,10 +753,14 @@ function spawnPillarPair(initial = false) {
     scored: false
   });
 
-  GameState.timeUntilNextPillar = spacing / GameState.scrollSpeed;
+  const minInterval = CONFIG.pillar.minInterval || 0;
+  const baseInterval = spacing / GameState.scrollSpeed;
+  let interval = Math.max(minInterval, baseInterval);
   if (initial) {
-    GameState.timeUntilNextPillar *= 0.55;
+    const initialTarget = Math.max(minInterval, baseInterval * 0.55);
+    interval = Math.min(interval, initialTarget);
   }
+  GameState.timeUntilNextPillar = interval;
 }
 
 function spawnMeteor() {

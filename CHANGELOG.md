@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - Normalised pillar spacing and meteor cadence to avoid unfair gaps during long sessions.
+- Enforced a 0.95s minimum interval between pillar pairs so overlapping obstacles no longer create impossible walls.
 - Restored SoundFX coverage for mute toggles/pickups and corrected the wrapValue utility regression from the feature draft.
 
 ### Documentation
@@ -21,4 +22,5 @@ All notable changes to this project will be documented in this file.
 - Completed Phase 4 in `docs/development-plan.md` and outlined QA next steps.
 
 [1.0.0]: https://github.com/fusioncomputing/flappydragongame/releases/tag/v1.0.0
+
 
